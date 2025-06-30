@@ -1,24 +1,17 @@
-fn main() {
+use battleship::{BitBoard, Orientation}; 
 
-    
-    println!("Hello, world!");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // default() now tries 10×10 first
+    let mut board0 = BitBoard::<u128>::default();
+    board0.fill(1, 1, Orientation::Horizontal, 5, true)?;
+    board0.fill(3, 1, Orientation::Vertical, 4, true)?;
+    let mut board1 = BitBoard::<u128>::default();
+    board1.fill(1, 1, Orientation::Vertical, 5, true)?;
+    board1.fill(9, 5, Orientation::Horizontal, 3, true)?;
+    println!("{}\n", board0);
+    println!("{}\n", board1);
+    println!("{}\n", board0 | board1);
+    println!("{}\n", board0.intersects(&board1).unwrap());
+    println!("{}\n", board0 & board1);
+    Ok(())
 }
-
-
-
-
-// mod domain; mod engine_api; mod engine; mod protocol;
-// mod transport; mod stub; mod skeleton; mod cli;
-
-// use transport::InMemoryTransport; use engine::Engine;
-// use stub::Stub; use skeleton::Skeleton; use cli::run_cli;
-// #[tokio::main]
-// async fn main() -> anyhow::Result<()> {
-//     // choose transport
-//     let (t1, t2) = InMemoryTransport::new_pair();
-//     let mut skel1 = Skeleton { engine: Engine::new(), transport: t1.clone() };
-//     tokio::spawn(async move { skel1.run().await.unwrap() });
-
-//     let api: Box<dyn GameApi> = Box::new(Stub::new(t2));
-//     run_cli(api).await
-// }
