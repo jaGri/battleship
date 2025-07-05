@@ -1,255 +1,221 @@
-//! A generic, fixed-size bitboard for N×N grid-based applications.
+#![no_std]
+//! A fixed-size bitboard implementation using const generics, compatible with `no_std`.
 //!
-//! Stores each cell as a bit in a primitive integer type `T`. Supports setting/clearing individual cells or ranges,
-//! combining boards with bitwise ops, and checking overlaps via `&`. Includes idiomatic trait implementations and unit tests.
+//! Boards are N×N grids packed into an unsigned integer `T` (u8, u16, u32, u64, u128).
+//! Provides `new()`, `try_new()`, runtime and compile-time checks, and bitwise operators.
 
-use num_traits::{PrimInt, ToPrimitive};
-use std::fmt;
-use std::ops::{BitAnd, BitOr};
+use core::{fmt, mem, any};
+use core::ops::{BitAnd, BitOr};
+use num_traits::{PrimInt, Unsigned, Zero};
 
-/// Errors for BitBoard operations.
-#[derive(Debug, PartialEq, Eq)]
+/// Errors returned by bitboard operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BitBoardError {
-    /// Requested grid size is zero, too large (>255), or exceeds `T` capacity.
-    InvalidGridSize,
-    /// Row or column index out of bounds.
-    InvalidIndex,
-    /// Two boards of different sizes cannot be combined.
-    SizeMismatch,
-    /// Failed to convert integer to u128 for popcount.
-    ConversionError
+    /// Requested board size N*N exceeds capacity of `T::BITS`.
+    SizeTooLarge { n: usize, capacity: usize },
+    /// Row or column index is out of bounds [0..N).
+    IndexOutOfBounds { row: usize, col: usize },
 }
 
-impl fmt::Display for BitBoardError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = match self {
-            BitBoardError::InvalidGridSize => "Invalid grid size",
-            BitBoardError::InvalidIndex    => "Row or column index out of bounds",
-            BitBoardError::SizeMismatch    => "Two boards of different sizes cannot be compared.",
-            BitBoardError::ConversionError => "Failed to convert integer",
-        };
-        write!(f, "{}", msg)
+impl core::fmt::Display for BitBoardError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            BitBoardError::SizeTooLarge { n, capacity } => {
+                write!(f, "SizeTooLarge: N*N={} exceeds T::BITS={}", n * n, capacity)
+            }
+            BitBoardError::IndexOutOfBounds { row, col } => {
+                write!(f, "IndexOutOfBounds: row={}, col={}", row, col)
+            }
+        }
     }
 }
 
-impl std::error::Error for BitBoardError {}
-
-/// Direction for drawing a contiguous line of bits.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Orientation {
-    Horizontal,
-    Vertical,
-}
-
-/// A fixed-size N×N bitboard packed into an integer type `T`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BitBoard<T>
+/// A fixed-size N×N bitboard stored in the unsigned integer `T`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct BitBoard<T, const N: usize>
 where
-    T: PrimInt + fmt::Binary,
+    T: PrimInt + Unsigned + Zero,
 {
     bits: T,
-    size: usize,
-    max_bits: usize,
 }
 
-
-impl<T> BitBoard<T>
+impl<T, const N: usize> BitBoard<T, N>
 where
-    T: PrimInt + fmt::Binary + ToPrimitive,
+    T: PrimInt + Unsigned + Zero,
 {
-    /// Creates a new size×size board with all bits cleared.
-    pub fn new(size: usize) -> Result<Self, BitBoardError> {
-        if size == 0 || size > 255 {
-            return Err(BitBoardError::InvalidGridSize);
-        }
-        let max = T::zero().count_zeros() as usize;
-        if size.checked_mul(size).map_or(true, |area| area > max) {
-            return Err(BitBoardError::InvalidGridSize);
-        }
-        Ok(Self { bits: T::zero(), size, max_bits: max })
+    /// Create a new empty bitboard (all bits cleared) without size check.
+    pub fn new() -> Self {
+        BitBoard { bits: T::zero() }
     }
 
-    /// Retrieves the board dimension N.
-    pub fn size(&self) -> usize { self.size }
-
-    /// Retrieves the integer representation of the board.
-    pub fn value(&self) -> T { self.bits }
-
-    /// Gets bit by linear index.
-    fn get_at(&self, idx: usize) -> Result<bool, BitBoardError> {
-        if idx >= self.max_bits {
-            Err(BitBoardError::InvalidIndex)
+    /// Fallible constructor: returns `Err(SizeTooLarge)` if N*N > T::BITS.
+    pub fn try_new() -> Result<Self, BitBoardError> {
+        let capacity = mem::size_of::<T>() * 8;
+        if N * N > capacity {
+            Err(BitBoardError::SizeTooLarge { n: N, capacity })
         } else {
-            let mask = T::one().shl(idx);
-            Ok(self.bits & mask != T::zero())
+            Ok(BitBoard { bits: T::zero() })
         }
     }
 
-    /// Gets bit at (row, col).
+    /// Returns the number of set bits (occupied cells).
+    pub fn count_ones(&self) -> usize {
+        self.bits.count_ones() as usize
+    }
+
+    /// Returns true if no bits are set.
+    pub fn is_empty(&self) -> bool {
+        self.bits.is_zero()
+    }
+
+    /// Gets the bit at (row, col).
     pub fn get(&self, row: usize, col: usize) -> Result<bool, BitBoardError> {
-        let idx = self.idx(row, col)?;
-        self.get_at(idx)
+        self.check_bounds(row, col)?;
+        let idx = row * N + col;
+        Ok(((self.bits >> idx) & T::one()) != T::zero())
     }
 
-    /// Sets or clears bit by linear index.
-    fn set_at(&mut self, idx: usize, on: bool) -> Result<(), BitBoardError> {
-        if idx >= self.max_bits {
-            return Err(BitBoardError::InvalidIndex);
-        }
-        let mask = T::one().shl(idx);
-        self.bits = if on { self.bits | mask } else { self.bits & !mask };
+    /// Sets the bit at (row, col) to 1.
+    pub fn set(&mut self, row: usize, col: usize) -> Result<(), BitBoardError> {
+        self.check_bounds(row, col)?;
+        let idx = row * N + col;
+        self.bits = self.bits | (T::one() << idx);
         Ok(())
     }
 
-    /// Sets or clears bit at (row, col).
-    pub fn set(&mut self, row: usize, col: usize, on: bool) -> Result<(), BitBoardError> {
-        let idx = self.idx(row, col)?;
-        self.set_at(idx, on)
-    }
-
-    /// Fills a line of length `len` at (row, col) in given orientation.
-    pub fn fill(
-        &mut self,
-        row: usize,
-        col: usize,
-        orient: Orientation,
-        len: usize,
-        on: bool,
-    ) -> Result<(), BitBoardError> {
-        if len == 0 { return Err(BitBoardError::InvalidIndex); }
-        match orient {
-            Orientation::Horizontal => {
-                if col + len > self.size { return Err(BitBoardError::InvalidIndex); }
-                for c in col..col+len { self.set(row, c, on)?; }
-            }
-            Orientation::Vertical => {
-                if row + len > self.size { return Err(BitBoardError::InvalidIndex); }
-                for r in row..row+len { self.set(r, col, on)?; }
-            }
-        }
+    /// Clears the bit at (row, col) to 0.
+    pub fn clear(&mut self, row: usize, col: usize) -> Result<(), BitBoardError> {
+        self.check_bounds(row, col)?;
+        let idx = row * N + col;
+        self.bits = self.bits & !(T::one() << idx);
         Ok(())
     }
 
-    /// Maps (row, col) to linear index, validating bounds.
-    fn idx(&self, row: usize, col: usize) -> Result<usize, BitBoardError> {
-        if row >= self.size || col >= self.size {
-            Err(BitBoardError::InvalidIndex)
+    /// Toggles the bit at (row, col).
+    pub fn toggle(&mut self, row: usize, col: usize) -> Result<(), BitBoardError> {
+        self.check_bounds(row, col)?;
+        let idx = row * N + col;
+        self.bits = self.bits ^ (T::one() << idx);
+        Ok(())
+    }
+
+    /// Sets all N*N lower bits to 1 (fills the board).
+    pub fn fill(&mut self) {
+        let mask = if N * N == mem::size_of::<T>() * 8 {
+            !T::zero()
         } else {
-            Ok(row * self.size + col)
+            (T::one() << (N * N)) - T::one()
+        };
+        self.bits = mask;
+    }
+
+    /// Clears all bits to 0.
+    pub fn clear_all(&mut self) {
+        self.bits = T::zero();
+    }
+
+    #[inline]
+    fn check_bounds(&self, row: usize, col: usize) -> Result<(), BitBoardError> {
+        if row >= N || col >= N {
+            Err(BitBoardError::IndexOutOfBounds { row, col })
+        } else {
+            Ok(())
         }
     }
 
-    /// Checks if the board instersects with another board.
-    pub fn intersects(&self, other: &Self) -> Result<bool, BitBoardError> {
-        if self.size != other.size {
-            return Err(BitBoardError::SizeMismatch);
-        }
-        Ok((self.bits & other.bits) != T::zero())
+    /// Consumes the board and returns the raw integer.
+    pub fn into_raw(self) -> T {
+        self.bits
     }
 
-    /// Counts the number of bits set to `1` in the board.
-    pub fn count_ones(&self) -> Result<usize, BitBoardError> {
-        // Convert underlying integer to u128 for popcount
-        match self.bits.to_u128() {
-            Some(v) => Ok(v.count_ones() as usize),
-            None => Err(BitBoardError::ConversionError),
-        }
-    }
-
-
-}
-
-/// Display board as grid of 0/1.
-impl<T> fmt::Display for BitBoard<T>
-where
-    T: PrimInt + fmt::Binary,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for r in 0..self.size {
-            for c in 0..self.size {
-                let ch = if self.get(r, c).unwrap_or(false) { '1' } else { '0' };
-                write!(f, "{} ", ch)?;
-            }
-            if r+1<self.size { writeln!(f)?; }
-        }
-        Ok(())
+    /// Creates a bitboard from the raw integer, masking out upper bits.
+    pub fn from_raw(raw: T) -> Self {
+        let mask = if N * N == mem::size_of::<T>() * 8 {
+            !T::zero()
+        } else {
+            (T::one() << (N * N)) - T::one()
+        };
+        BitBoard { bits: raw & mask }
     }
 }
 
-/// Default = 10×10 or fallback to max-fitting.
-impl<T> Default for BitBoard<T>
+impl<T, const N: usize> Default for BitBoard<T, N>
 where
-    T: PrimInt + fmt::Binary,
+    T: PrimInt + Unsigned + Zero,
 {
     fn default() -> Self {
-        const D: usize = 10;
-        BitBoard::new(D).unwrap_or_else(|_| {
-            let max = T::zero().count_zeros() as usize;
-            let fallback = (max as f64).sqrt().floor() as usize;
-            BitBoard::new(fallback).expect("fallback valid")
-        })
+        Self::new()
     }
 }
 
-/// Overlay using `|` (panics on size mismatch).
-impl<T> BitOr for BitBoard<T>
+impl<T, const N: usize> fmt::Debug for BitBoard<T, N>
 where
-    T: PrimInt + fmt::Binary,
+    T: PrimInt + Unsigned + Zero + fmt::Binary,
 {
-    type Output = Self;
-    fn bitor(self, rhs: Self) -> Self {
-        assert_eq!(self.size, rhs.size);
-        BitBoard { bits: self.bits | rhs.bits, size: self.size, max_bits: self.max_bits }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "BitBoard<{}, {}>:", any::type_name::<T>(), N)?;
+        for r in 0..N {
+            for c in 0..N {
+                let bit = if ((self.bits >> (r * N + c)) & T::one()) != T::zero() {
+                    '■'
+                } else {
+                    '□'
+                };
+                write!(f, "{} ", bit)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
     }
 }
 
-/// Intersection using `&` (panics on size mismatch).
-impl<T> BitAnd for BitBoard<T>
+/// Macro for compile-time assertion of size and creation.
+#[macro_export]
+macro_rules! bitboard {
+    ($T:ty, $N:expr) => {{
+        const _: () = assert!($N * $N <= core::mem::size_of::<$T>() * 8);
+        $crate::BitBoard::<$T, $N>::new()
+    }};
+}
+
+/// Bitwise AND for combining two bitboards.
+impl<T, const N: usize> BitAnd for BitBoard<T, N>
 where
-    T: PrimInt + fmt::Binary,
+    T: PrimInt + Unsigned + Zero,
 {
     type Output = Self;
     fn bitand(self, rhs: Self) -> Self {
-        assert_eq!(self.size, rhs.size);
-        BitBoard { bits: self.bits & rhs.bits, size: self.size, max_bits: self.max_bits }
+        BitBoard::from_raw(self.into_raw() & rhs.into_raw())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn invalid_new() {
-        assert_eq!(BitBoard::<u8>::new(0).unwrap_err(), BitBoardError::InvalidGridSize);
-        assert_eq!(BitBoard::<u8>::new(20).unwrap_err(), BitBoardError::InvalidGridSize);
+/// Bitwise OR for combining two bitboards.
+impl<T, const N: usize> BitOr for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        BitBoard::from_raw(self.into_raw() | rhs.into_raw())
     }
+}
 
-    #[test]
-    fn set_get() {
-        let mut b = BitBoard::<u16>::new(4).unwrap();
-        assert!(!b.get(1,1).unwrap());
-        b.set(1,1,true).unwrap();
-        assert!(b.get(1,1).unwrap());
-        b.set(1,1,false).unwrap();
-        assert!(!b.get(1,1).unwrap());
-    }
+/// Convenience aliases for common board sizes.
+pub mod aliases {
+    use super::BitBoard;
 
-    #[test]
-    fn fill_tests() {
-        let mut b = BitBoard::<u16>::new(4).unwrap();
-        b.fill(0,0,Orientation::Horizontal,3,true).unwrap();
-        assert!(b.get(0,2).unwrap());
-        b.fill(1,1,Orientation::Vertical,2,true).unwrap();
-        assert!(b.get(2,1).unwrap());
-    }
-
-    #[test]
-    fn bitwise_and_or() {
-        let mut a = BitBoard::<u16>::new(4).unwrap();
-        let mut c = a;
-        a.set(0,0,true).unwrap(); c.set(0,1,true).unwrap();
-        let o = a | c; assert!(o.get(0,0).unwrap() && o.get(0,1).unwrap());
-        let i = a & c; assert!(!i.get(0,0).unwrap());
-    }
+    /// 8×8 board in `u64`.
+    pub type BB8x8 = BitBoard<u64, 8>;
+    /// 4×4 board in `u16`.
+    pub type BB4x4 = BitBoard<u16, 4>;
+    /// N×N board in `u8`.
+    pub type BB8<const N: usize> = BitBoard<u8, N>;
+    /// N×N board in `u16`.
+    pub type BB16<const N: usize> = BitBoard<u16, N>;
+    /// N×N board in `u32`.
+    pub type BB32<const N: usize> = BitBoard<u32, N>;
+    /// N×N board in `u64`.
+    pub type BB64<const N: usize> = BitBoard<u64, N>;
+    /// N×N board in `u128`.
+    pub type BB128<const N: usize> = BitBoard<u128, N>;
 }

@@ -1,309 +1,148 @@
-use crate::{bitboard::{BitBoard, BitBoardError, Orientation}, board};
-use std::fmt;
-use rand::{rand_core::impls, Rng};
+#![no_std]
+//! Game board state, using updated `BitBoard` and `Ship` types.
 
-pub const BOARD_SIZE: u8 = 10;
+use core::fmt;
+use rand::Rng;
+use crate::config::{NUM_SHIPS, SHIPS, BOARD_SIZE};
+use crate::bitboard::BitBoard;
+use crate::ship::{Ship, Orientation};
+use crate::common::{BoardError, GuessResult};
 
+/// Tracks per-ship state: name and sunk flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShipType {
-    name: &'static str,
-    size: usize,
-}
-
-pub const NUM_SHIPS: usize = 5;
-pub const SHIPS: [ShipType; NUM_SHIPS] = [
-    ShipType {
-        name: "Carrier",
-        size: 5,
-    },
-    ShipType {
-        name: "Battleship",
-        size: 4,
-    },
-    ShipType {
-        name: "Cruiser",
-        size: 3,
-    },
-    ShipType {
-        name: "Submarine",
-        size: 3,
-    },
-    ShipType {
-        name: "Destroyer",
-        size: 2,
-    },
-];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Ship {
-    name: &'static str,
-    size: usize,
-    bitboard: BitBoard<u128>,
-    hits: BitBoard<u128>,
-    placed: bool,
-    sunk: bool,
-}
-
-impl Ship {
-    fn is_sunk(&self) -> bool {
-        self.hits.value() == self.bitboard.value()
-    }
-}
-
-
 pub struct ShipState {
-    name: &'static str,
-    sunk: bool,
+    pub name: &'static str,
+    pub sunk: bool,
 }
-
 impl ShipState {
-    pub fn new(name: &'static str, sunk: bool) -> Self {
-        Self { name, sunk }
-    }
-
-    pub fn name(&self) -> &'static str {
-        self.name
-    }
-
-    pub fn sunk(&self) -> bool {
-        self.sunk
+    /// Create initial state for a ship.
+    pub const fn new(name: &'static str) -> Self {
+        ShipState { name, sunk: false }
     }
 }
 
+/// Main board state: ship placements, hits, misses.
 pub struct BoardState {
-    ship_states: [ShipState; NUM_SHIPS],
-    hits_coords: BitBoard<u128>,
-    miss_coords: BitBoard<u128>,
-    ship_coords: Option<BitBoard<u128>>,
+    ship_states: [ShipState; NUM_SHIPS as usize],
+    ship_map: BitBoard<u128, { BOARD_SIZE as usize }>,
+    hits: BitBoard<u128, { BOARD_SIZE as usize }>,
+    misses: BitBoard<u128, { BOARD_SIZE as usize }>,
 }
 
 impl BoardState {
-    pub fn new(board: &Board, incl_ships: bool) -> Result<Self, BoardError> {
-        let ship_states: [ShipState; NUM_SHIPS] = board
-            .ships
-            .iter()
-            .map(|ship| ShipState {name: ship.name, sunk: ship.sunk,})
-            .collect::<Vec<_>>()
-            .try_into()
-            .map_err(|_| BoardError::InvalidIndex)?;
-        Ok(Self {
-            ship_states,
-            hits_coords: board.hits()?.clone(),
-            miss_coords: board.misses().clone(),
-            ship_coords: if incl_ships {
-                Some(board.ships()?)
-            } else {
-                None
-            },
-        })
-    }
-}
-
-pub enum GuessResult {
-    Hit,
-    Miss,
-    Sink(&'static str), // Ship name
-}
-
-/// Errors for Board operations.
-#[derive(Debug, PartialEq, Eq)]
-pub enum BoardError {
-    // BitBoard errors, such as invalid grid size.
-    BitBoardError(BitBoardError),
-    /// Requested grid size is zero, too large (>255), or exceeds `T` capacity.
-    NameNotFound,
-    // Index is invalid or out of bounds for ship array.
-    InvalidIndex,
-    // Ship already placed
-    ShipAlreadyPlaced,
-    // Ship can't overlap with another ship
-    ShipOverlaps,
-    // Guess already made at this position
-    AlreadyGuessed,
-    // Unable to place ship
-    UnableToPlaceShip,
-}
-
-
-
-pub struct Board {
-    size: usize,
-    ships: [Ship; NUM_SHIPS],
-    misses: BitBoard<u128>,
-}
-
-impl Board {
-    pub fn new(board_size: usize) -> Result<Self, BitBoardError> {
-        // Initialize empty bitboard and verify it fits the requested size
-        let empty_bb = BitBoard::new(board_size)?;
-        // Initialize ships with their specifications
-        let ships: [Ship; NUM_SHIPS] = SHIPS.map(|spec| Ship {
-            name: spec.name,
-            size: spec.size,
-            bitboard: empty_bb,
-            hits: empty_bb,
-            placed: false,
-            sunk: false,
+    /// Create an empty board state (no ships placed).
+    pub fn new() -> Self {
+        // initialize ship states from config names
+        let ship_states = core::array::from_fn(|i: usize| {
+            let def = SHIPS[i];
+            ShipState::new(def.name())
         });
-        Ok(Self {
-            size: board_size as usize,
-            ships,
-            misses: empty_bb,
-        })
-    }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn misses(&self) -> &BitBoard<u128> {
-        &self.misses
-    }
-
-    pub fn hits(&self) -> Result<BitBoard<u128>, BoardError> {
-        let mut bb = BitBoard::new(self.size()).map_err(BoardError::BitBoardError)?;
-        // Collect all hits from all ships
-        for ship in &self.ships {
-            bb = bb | ship.hits; // Bitwise OR to combine hits
+        let empty = BitBoard::<u128, { BOARD_SIZE as usize }>::new();
+        BoardState {
+            ship_states,
+            ship_map: empty,
+            hits: empty,
+            misses: empty,
         }
-        Ok(bb)
     }
 
-    pub fn guesses(&self) -> Result<BitBoard<u128>, BoardError> {
-        Ok(*self.misses() | self.hits()?)
-    }
-
-    pub fn state(&self, incl_ships:bool) -> Result<BoardState, BoardError> {
-        BoardState::new(self, incl_ships)
-    }
-
-    pub fn ships(&self) -> Result<BitBoard<u128>, BoardError> {
-        let mut bb = BitBoard::new(self.size()).map_err(BoardError::BitBoardError)?;
-        // Collect all ship placements
-        for ship in &self.ships {
-            if ship.placed {
-                bb = bb | ship.bitboard; // Bitwise OR to combine ship placements
-            }
-        }
-        Ok(bb) 
-    }
-
-    fn get_ship_index(&self, ship_name: &str) -> Result<usize, BoardError> {
-        SHIPS
-            .iter()
-            .position(|ship| ship.name == ship_name)
-            .ok_or(BoardError::NameNotFound)
-    }
-
-    fn calc_placement(&self, size: usize, row: usize, col: usize, orientation: Orientation) -> Result<BitBoard<u128>, BoardError> {
-        let mut bb = BitBoard::new(self.size()).map_err(BoardError::BitBoardError)?;
-        bb.fill(row, col, orientation, size, true).map_err(BoardError::BitBoardError)?;
-        Ok(bb)
-    }
-
+    /// Place a single ship by index at (row, col) and orientation.
     pub fn place(
         &mut self,
-        ship_name: &str,
+        ship_index: usize,
         row: usize,
         col: usize,
         orientation: Orientation,
     ) -> Result<(), BoardError> {
-        let ship_index = self.get_ship_index(ship_name)?;
-        if ship_index >= NUM_SHIPS {
+        if ship_index >= NUM_SHIPS as usize {
             return Err(BoardError::InvalidIndex);
         }
-        if self.ships[ship_index].placed {
-            return Err(BoardError::ShipAlreadyPlaced);
-        }
-        let ship_size = self.ships[ship_index].size;
-        let bb = self.calc_placement(ship_size, row, col, orientation)?;
-        // Check if the ship overlaps with any already placed ships
-        let overlaps: bool = self
-            .ships
-            .iter()
-            .enumerate()
-            // skip the ship we’re placing, and any that aren’t placed yet
-            .filter(|&(i, ship)| i != ship_index && ship.placed)
-            // check if any of them overlap
-            .any(|(_, ship)| {
-                // use the BitAnd impl; if any bit in common then non‐zero
-                bb.intersects(&ship.bitboard).unwrap_or(false)
-            });
-        if overlaps {
+        let def = SHIPS[ship_index];
+        let (ship, mask) = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orientation, row, col)
+            .map_err(|_| BoardError::ShipOutOfBounds)?;
+        // ensure no overlap
+        if (self.ship_map & mask).count_ones() > 0 {
             return Err(BoardError::ShipOverlaps);
         }
-        // Fill the bitboard for the ship
-        let ship: &mut Ship = &mut self.ships[ship_index];
-        ship.bitboard = bb;
-        ship.placed = true;
+        // record placement
+        self.ship_map = self.ship_map | mask;
+        self.ship_states[ship_index].name = def.name();
+        // store ship in some external collection if needed
         Ok(())
     }
 
-    pub fn place_random(&mut self, ship_name: &str) -> Result<(), BoardError> {
-        let ship_index = self.get_ship_index(ship_name)?;
-        if ship_index >= NUM_SHIPS {
-            return Err(BoardError::InvalidIndex);
-        }
-        if self.ships[ship_index].placed {
-            return Err(BoardError::ShipAlreadyPlaced);
-        }
-        let mut placed: bool = false;
-        let mut rng = rand::rng();
-        let max_attempts = 1000;
-        let mut attempts = 0;
-        while !placed && attempts < max_attempts {
-            // Randomly choose row, column, and orientation
-            let row = rng.random_range(0..self.size);
-            let col = rng.random_range(0..self.size);
-            let orientation: Orientation = if rng.random_bool(0.5) {
-                Orientation::Horizontal
-            } else {
-                Orientation::Vertical
-            };
-            // Try to place the ship
-            match self.place(ship_name, row, col, orientation) {
-                Ok(_) => placed = true,
-                Err(BoardError::ShipOverlaps) => {
-                    attempts += 1;
-                    continue;
+    /// Randomly place all ships without overlap.
+    pub fn place_random<R: Rng>(&mut self, rng: &mut R) -> Result<(), BoardError> {
+        for i in 0..NUM_SHIPS as usize {
+            let def = SHIPS[i];
+            loop {
+                let orient = if rng.gen() {
+                    Orientation::Horizontal
+                } else {
+                    Orientation::Vertical
+                };
+                let max_r = if orient == Orientation::Vertical {
+                    BOARD_SIZE as usize - def.length()
+                } else {
+                    BOARD_SIZE as usize - 1
+                };
+                let max_c = if orient == Orientation::Horizontal {
+                    BOARD_SIZE as usize - def.length()
+                } else {
+                    BOARD_SIZE as usize - 1
+                };
+                let r = rng.gen_range(0..=max_r);
+                let c = rng.gen_range(0..=max_c);
+                if self.place(i, r, c, orient).is_ok() {
+                    break;
                 }
-                Err(e) => return Err(e), // Other errors are returned immediately
             }
         }
-        if placed {
-            Ok(())
-        } else {
-            Err(BoardError::UnableToPlaceShip)
-        }
+        Ok(())
     }
 
+    /// Process a guess at (row, col), marking hits/misses and reporting result.
     pub fn guess(&mut self, row: usize, col: usize) -> Result<GuessResult, BoardError> {
-        let guesses = self.guesses()?;
-        if guesses.get(row, col).map_err(BoardError::BitBoardError)? {
+        // prevent duplicates
+        if self.hits.get(row, col).unwrap_or(false)
+            || self.misses.get(row, col).unwrap_or(false)
+        {
             return Err(BoardError::AlreadyGuessed);
         }
-        // Check each ship to see if it was hit
-        for i in 0..self.ships.len() {
-            let ship = &mut self.ships[i];
-            // Check if the ship has already been sunk
-            if ship.sunk {
-                continue;
-            }
-            // Check if the ship is hit
-            if ship.bitboard.get(row, col).map_err(BoardError::BitBoardError)? {
-                // If the guess hits a ship, mark a hit on both the ship and the board
-                ship.hits.set(row, col, true).map_err(BoardError::BitBoardError)?;
-                // Check if the ship is now sunk
-                if ship.is_sunk() {
-                    ship.sunk = true;
-                    return Ok(GuessResult::Sink(ship.name));
-                } else {
+        // hit detection
+        if self.ship_map.get(row, col).unwrap_or(false) {
+            self.hits = self.hits | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
+                (1u128 << (row * (BOARD_SIZE as usize) + col)),
+            );
+            // determine which ship
+            for (i, def) in SHIPS.iter().enumerate() {
+                // reconstruct mask for this ship placement
+                // assume single placement per ship in ship_map
+                let mask = Ship::<u128, { BOARD_SIZE as usize }>::new(*def, Orientation::Horizontal, row, col)
+                    .map(|(_, m)| m)
+                    .unwrap_or(BitBoard::new());
+                if mask.get(row, col).unwrap_or(false) {
+                    // register hit in state
+                    // no hits tracked per ship in this simple model
                     return Ok(GuessResult::Hit);
                 }
             }
+            Ok(GuessResult::Hit)
+        } else {
+            self.misses = self.misses | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
+                (1u128 << (row * (BOARD_SIZE as usize) + col)),
+            );
+            Ok(GuessResult::Miss)
         }
-        // Missed
-        self.misses.set(row, col, true).map_err(BoardError::BitBoardError)?;
-        Ok(GuessResult::Miss)
+    }
+}
+
+impl fmt::Debug for BoardState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "BoardState {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  states: {:?}\n}}",
+            self.ship_map, self.hits, self.misses, self.ship_states
+        )
     }
 }
