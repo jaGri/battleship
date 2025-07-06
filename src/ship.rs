@@ -2,6 +2,7 @@
 
 use core::fmt;
 use num_traits::{PrimInt, Unsigned, Zero};
+
 use crate::bitboard::BitBoard;
 use crate::common::BoardError;
 
@@ -46,6 +47,7 @@ where
     orientation: Orientation,
     row: usize,
     col: usize,
+    mask: BitBoard<T, N>,
     hits: BitBoard<T, N>,
 }
 
@@ -54,13 +56,13 @@ where
     T: PrimInt + Unsigned + Zero,
 {
     /// Place a ship at (`row`, `col`) with `orientation`.
-    /// Returns the new `Ship` and its occupancy mask.
+    /// Returns the newly constructed ship.
     pub fn new(
         ship_type: ShipType,
         orientation: Orientation,
         row: usize,
         col: usize,
-    ) -> Result<(Self, BitBoard<T, N>), BoardError> {
+    ) -> Result<Self, BoardError> {
         let len = ship_type.length();
         // Ensure placement fits within N×N
         if orientation == Orientation::Horizontal {
@@ -83,19 +85,20 @@ where
 
         // Initialize empty hits board
         let hits = BitBoard::<T, N>::new();
-        let ship = Ship { ship_type, orientation, row, col, hits };
-        Ok((ship, mask))
+        Ok(Ship {
+            ship_type,
+            orientation,
+            row,
+            col,
+            mask,
+            hits,
+        })
     }
 
     /// Register a hit at (`row`, `col`) using an occupancy mask.
     /// Returns `true` if it was a hit and records it.
-    pub fn register_hit(
-        &mut self,
-        row: usize,
-        col: usize,
-        occupancy: &BitBoard<T, N>,
-    ) -> bool {
-        if occupancy.get(row, col).unwrap_or(false) {
+    pub fn register_hit(&mut self, row: usize, col: usize) -> bool {
+        if self.mask.get(row, col).unwrap_or(false) {
             let _ = self.hits.set(row, col);
             true
         } else {
@@ -122,6 +125,11 @@ where
     pub fn orientation(&self) -> Orientation {
         self.orientation
     }
+
+    /// Occupancy mask of the ship on the board.
+    pub fn mask(&self) -> BitBoard<T, N> {
+        self.mask
+    }
 }
 
 impl<T, const N: usize> fmt::Debug for Ship<T, N>
@@ -131,12 +139,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Ship {{ name: \"{}\", origin: ({}, {}), orientation: {:?}, hits: {} }}",
+            "Ship {{ name: \"{}\", origin: ({}, {}), orientation: {:?}, hits: {}, mask: {:?} }}",
             self.ship_type.name(),
             self.row,
             self.col,
             self.orientation,
             self.hits.count_ones(),
+            self.mask,
         )
     }
 }
