@@ -1,4 +1,3 @@
-#![no_std]
 //! Common types for Battleship: board errors and guess results.
 
 use crate::bitboard::BitBoardError;

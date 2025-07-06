@@ -1,4 +1,3 @@
-#![no_std]
 //! Ship definitions and placement logic using our `BitBoard`.
 
 use core::fmt;

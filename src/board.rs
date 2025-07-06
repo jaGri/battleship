@@ -1,4 +1,3 @@
-#![no_std]
 //! Game board state, using updated `BitBoard` and `Ship` types.
 
 use core::fmt;
