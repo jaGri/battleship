@@ -1,17 +1,27 @@
-use battleship::{BitBoard, Orientation}; 
+use battleship::{BitBoard, Orientation, BoardState};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // default() now tries 10×10 first
-    // let mut board0 = BitBoard::<u128>::default();
-    // board0.fill(1, 1, Orientation::Horizontal, 5, true)?;
-    // board0.fill(3, 1, Orientation::Vertical, 4, true)?;
-    // let mut board1 = BitBoard::<u128>::default();
-    // board1.fill(1, 1, Orientation::Vertical, 5, true)?;
-    // board1.fill(9, 5, Orientation::Horizontal, 3, true)?;
-    // println!("{}\n", board0);
-    // println!("{}\n", board1);
-    // println!("{}\n", board0 | board1);
-    // println!("{}\n", board0.intersects(&board1).unwrap());
-    // println!("{}\n", board0 & board1);
-    Ok(())
+fn main() {
+    // Demonstrate basic bitboard usage
+    let mut board0 = BitBoard::<u128, 10>::new();
+    for i in 0..5 { board0.set(1, 1 + i).unwrap(); }
+    for i in 0..4 { board0.set(3 + i, 1).unwrap(); }
+
+    let mut board1 = BitBoard::<u128, 10>::new();
+    for i in 0..5 { board1.set(1 + i, 1).unwrap(); }
+    for i in 0..3 { board1.set(9, 5 + i).unwrap(); }
+
+    println!("{}\n", board0);
+    println!("{}\n", board1);
+    println!("{}\n", board0 | board1);
+    println!("intersects: {}\n", !(board0 & board1).is_empty());
+    println!("{}\n", board0 & board1);
+
+    // Demonstrate board and ship placement
+    let mut state = BoardState::new();
+    state.place(0, 0, 0, Orientation::Horizontal).unwrap();
+    state.place(1, 2, 2, Orientation::Vertical).unwrap();
+    println!("Initial state: {:?}", state);
+    let result = state.guess(0, 0).unwrap();
+    println!("Guess (0,0): {:?}", result);
+    println!("Updated state: {:?}", state);
 }
