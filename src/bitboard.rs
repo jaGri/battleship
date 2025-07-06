@@ -1,11 +1,10 @@
-#![no_std]
 //! A fixed-size bitboard implementation using const generics, compatible with `no_std`.
 //!
 //! Boards are N×N grids packed into an unsigned integer `T` (u8, u16, u32, u64, u128).
 //! Provides `new()`, `try_new()`, runtime and compile-time checks, and bitwise operators.
 
 use core::{fmt, mem, any};
-use core::ops::{BitAnd, BitOr};
+use core::ops::{BitAnd, BitOr, BitXor, Not, BitAndAssign, BitOrAssign, BitXorAssign};
 use num_traits::{PrimInt, Unsigned, Zero};
 
 /// Errors returned by bitboard operations.
@@ -137,6 +136,23 @@ where
         };
         BitBoard { bits: raw & mask }
     }
+
+    /// Creates a bitboard from an iterator over `(row, col)` positions.
+    pub fn from_iter<I>(iter: I) -> Result<Self, BitBoardError>
+    where
+        I: IntoIterator<Item = (usize, usize)>,
+    {
+        let mut board = Self::new();
+        for (r, c) in iter {
+            board.set(r, c)?;
+        }
+        Ok(board)
+    }
+
+    /// Iterator over the set bits of the board.
+    pub fn iter_set_bits(&self) -> SetBits<'_, T, N> {
+        SetBits { board: self, idx: 0 }
+    }
 }
 
 impl<T, const N: usize> Default for BitBoard<T, N>
@@ -169,11 +185,58 @@ where
     }
 }
 
+impl<T, const N: usize> fmt::Display for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero + fmt::Binary,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for r in 0..N {
+            for c in 0..N {
+                let bit = if ((self.bits >> (r * N + c)) & T::one()) != T::zero() {
+                    '■'
+                } else {
+                    '□'
+                };
+                write!(f, "{} ", bit)?;
+            }
+            if r + 1 < N { writeln!(f)?; }
+        }
+        Ok(())
+    }
+}
+
+/// Iterator over the set bits of a bitboard.
+pub struct SetBits<'a, T, const N: usize>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    board: &'a BitBoard<T, N>,
+    idx: usize,
+}
+
+impl<'a, T, const N: usize> Iterator for SetBits<'a, T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    type Item = (usize, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.idx < N * N {
+            let idx = self.idx;
+            self.idx += 1;
+            if ((self.board.bits >> idx) & T::one()) != T::zero() {
+                return Some((idx / N, idx % N));
+            }
+        }
+        None
+    }
+}
+
 /// Macro for compile-time assertion of size and creation.
 #[macro_export]
 macro_rules! bitboard {
     ($T:ty, $N:expr) => {{
-        const _: () = assert!($N * $N <= core::mem::size_of::<$T>() * 8);
+        const _ASSERT: [(); 1] = [(); ($N * $N <= core::mem::size_of::<$T>() * 8) as usize];
+        let _ = _ASSERT;
         $crate::BitBoard::<$T, $N>::new()
     }};
 }
@@ -197,6 +260,55 @@ where
     type Output = Self;
     fn bitor(self, rhs: Self) -> Self {
         BitBoard::from_raw(self.into_raw() | rhs.into_raw())
+    }
+}
+
+/// Bitwise XOR for combining two bitboards.
+impl<T, const N: usize> BitXor for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self {
+        BitBoard::from_raw(self.into_raw() ^ rhs.into_raw())
+    }
+}
+
+/// Bitwise NOT for inverting a bitboard (within board bounds).
+impl<T, const N: usize> Not for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    type Output = Self;
+    fn not(self) -> Self {
+        Self::from_raw(!self.bits)
+    }
+}
+
+impl<T, const N: usize> BitAndAssign for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.bits = self.bits & rhs.bits;
+    }
+}
+
+impl<T, const N: usize> BitOrAssign for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.bits = self.bits | rhs.bits;
+    }
+}
+
+impl<T, const N: usize> BitXorAssign for BitBoard<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.bits = self.bits ^ rhs.bits;
     }
 }
 

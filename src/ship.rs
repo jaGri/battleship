@@ -3,6 +3,7 @@
 use core::fmt;
 use num_traits::{PrimInt, Unsigned, Zero};
 use crate::bitboard::BitBoard;
+use crate::common::BoardError;
 
 /// Orientation of a ship on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,17 +60,15 @@ where
         orientation: Orientation,
         row: usize,
         col: usize,
-    ) -> Result<(Self, BitBoard<T, N>), &'static str> {
+    ) -> Result<(Self, BitBoard<T, N>), BoardError> {
         let len = ship_type.length();
         // Ensure placement fits within N×N
         if orientation == Orientation::Horizontal {
             if col + len > N {
-                return Err("Ship placement out of bounds");
+                return Err(BoardError::ShipOutOfBounds);
             }
-        } else {
-            if row + len > N {
-                return Err("Ship placement out of bounds");
-            }
+        } else if row + len > N {
+            return Err(BoardError::ShipOutOfBounds);
         }
 
         // Build occupancy mask
@@ -79,7 +78,7 @@ where
                 Orientation::Horizontal => (row, col + i),
                 Orientation::Vertical => (row + i, col),
             };
-            mask.set(r, c).map_err(|_| "Index error")?;
+            mask.set(r, c)?;
         }
 
         // Initialize empty hits board
