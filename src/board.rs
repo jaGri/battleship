@@ -1,11 +1,11 @@
 //! Game board state, using updated `BitBoard` and `Ship` types.
 
+use crate::bitboard::BitBoard;
+use crate::common::{BoardError, GuessResult};
+use crate::config::{BOARD_SIZE, NUM_SHIPS, SHIPS};
+use crate::ship::{Orientation, Ship};
 use core::fmt;
 use rand::Rng;
-use crate::config::{NUM_SHIPS, SHIPS, BOARD_SIZE};
-use crate::bitboard::BitBoard;
-use crate::ship::{Ship, Orientation};
-use crate::common::{BoardError, GuessResult};
 
 /// Tracks per-ship state: name and sunk flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,8 +21,15 @@ impl ShipState {
 }
 
 /// Main board state: ship placements, hits, misses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PlacedShip {
+    ship: Ship<u128, { BOARD_SIZE as usize }>,
+    mask: BitBoard<u128, { BOARD_SIZE as usize }>,
+}
+
 pub struct BoardState {
     ship_states: [ShipState; NUM_SHIPS as usize],
+    ships: [Option<PlacedShip>; NUM_SHIPS as usize],
     ship_map: BitBoard<u128, { BOARD_SIZE as usize }>,
     hits: BitBoard<u128, { BOARD_SIZE as usize }>,
     misses: BitBoard<u128, { BOARD_SIZE as usize }>,
@@ -39,6 +46,7 @@ impl BoardState {
         let empty = BitBoard::<u128, { BOARD_SIZE as usize }>::new();
         BoardState {
             ship_states,
+            ships: [None; NUM_SHIPS as usize],
             ship_map: empty,
             hits: empty,
             misses: empty,
@@ -66,7 +74,7 @@ impl BoardState {
         // record placement
         self.ship_map = self.ship_map | mask;
         self.ship_states[ship_index].name = def.name();
-        // store ship in some external collection if needed
+        self.ships[ship_index] = Some(PlacedShip { ship, mask });
         Ok(())
     }
 
@@ -103,34 +111,36 @@ impl BoardState {
     /// Process a guess at (row, col), marking hits/misses and reporting result.
     pub fn guess(&mut self, row: usize, col: usize) -> Result<GuessResult, BoardError> {
         // prevent duplicates
-        if self.hits.get(row, col).unwrap_or(false)
-            || self.misses.get(row, col).unwrap_or(false)
-        {
+        if self.hits.get(row, col).unwrap_or(false) || self.misses.get(row, col).unwrap_or(false) {
             return Err(BoardError::AlreadyGuessed);
         }
         // hit detection
         if self.ship_map.get(row, col).unwrap_or(false) {
-            self.hits = self.hits | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                (1u128 << (row * (BOARD_SIZE as usize) + col)),
+            let bit = BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
+                1u128 << (row * (BOARD_SIZE as usize) + col),
             );
-            // determine which ship
-            for (i, def) in SHIPS.iter().enumerate() {
-                // reconstruct mask for this ship placement
-                // assume single placement per ship in ship_map
-                let mask = Ship::<u128, { BOARD_SIZE as usize }>::new(*def, Orientation::Horizontal, row, col)
-                    .map(|(_, m)| m)
-                    .unwrap_or(BitBoard::new());
-                if mask.get(row, col).unwrap_or(false) {
-                    // register hit in state
-                    // no hits tracked per ship in this simple model
-                    return Ok(GuessResult::Hit);
+            self.hits = self.hits | bit;
+
+            // determine which ship was hit
+            for (i, slot) in self.ships.iter_mut().enumerate() {
+                if let Some(ps) = slot {
+                    if ps.mask.get(row, col).unwrap_or(false) {
+                        ps.ship.register_hit(row, col, &ps.mask);
+                        if ps.ship.is_sunk() && !self.ship_states[i].sunk {
+                            self.ship_states[i].sunk = true;
+                            return Ok(GuessResult::Sink(ps.ship.ship_type().name()));
+                        }
+                        return Ok(GuessResult::Hit);
+                    }
                 }
             }
+            // should have found a ship; fallback
             Ok(GuessResult::Hit)
         } else {
-            self.misses = self.misses | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                (1u128 << (row * (BOARD_SIZE as usize) + col)),
-            );
+            self.misses = self.misses
+                | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
+                    (1u128 << (row * (BOARD_SIZE as usize) + col)),
+                );
             Ok(GuessResult::Miss)
         }
     }
@@ -140,8 +150,12 @@ impl fmt::Debug for BoardState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "BoardState {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  states: {:?}\n}}",
-            self.ship_map, self.hits, self.misses, self.ship_states
+            "BoardState {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  states: {:?},\n  ships: {:?}\n}}",
+            self.ship_map,
+            self.hits,
+            self.misses,
+            self.ship_states,
+            self.ships
         )
     }
 }
