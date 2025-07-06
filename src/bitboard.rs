@@ -342,9 +342,9 @@ where
 }
 
 /// Convenience aliases for common board sizes.
+#[allow(dead_code)]
 pub mod aliases {
     use super::BitBoard;
-
     /// 8×8 board in `u64`.
     pub type BB8x8 = BitBoard<u64, 8>;
     /// 4×4 board in `u16`.

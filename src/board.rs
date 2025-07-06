@@ -82,7 +82,7 @@ impl BoardState {
         for i in 0..NUM_SHIPS as usize {
             let def = SHIPS[i];
             loop {
-                let orient = if rng.gen() {
+                let orient = if rng.random() {
                     Orientation::Horizontal
                 } else {
                     Orientation::Vertical
@@ -97,8 +97,8 @@ impl BoardState {
                 } else {
                     BOARD_SIZE as usize - 1
                 };
-                let r = rng.gen_range(0..=max_r);
-                let c = rng.gen_range(0..=max_c);
+                let r = rng.random_range(0..=max_r);
+                let c = rng.random_range(0..=max_c);
                 if self.place(i, r, c, orient).is_ok() {
                     break;
                 }
@@ -138,7 +138,7 @@ impl BoardState {
         } else {
             self.misses = self.misses
                 | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                    (1u128 << (row * (BOARD_SIZE as usize) + col)),
+                    1u128 << (row * (BOARD_SIZE as usize) + col),
                 );
             Ok(GuessResult::Miss)
         }

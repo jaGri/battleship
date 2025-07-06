@@ -1,3 +1,4 @@
+#![no_std]
 mod common;
 mod bitboard;
 mod board;
