@@ -1,10 +1,11 @@
-//! A fixed-size bitboard implementation using const generics, compatible with `no_std`.
+//! A fixed-size bitboard implementation using const generics.
 //!
-//! Boards are N×N grids packed into an unsigned integer `T` (u8, u16, u32, u64, u128).
-//! Provides `new()`, `try_new()`, runtime and compile-time checks, and bitwise operators.
+//! The type is `no_std` friendly and avoids heap allocations. Boards are
+//! represented as an `N×N` grid packed into an unsigned integer `T`.
+//! Basic constructors and bitwise operations are provided.
 
-use core::{fmt, mem, any};
-use core::ops::{BitAnd, BitOr, BitXor, Not, BitAndAssign, BitOrAssign, BitXorAssign};
+use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
+use core::{any, fmt, mem};
 use num_traits::{PrimInt, Unsigned, Zero};
 
 /// Errors returned by bitboard operations.
@@ -20,7 +21,12 @@ impl core::fmt::Display for BitBoardError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             BitBoardError::SizeTooLarge { n, capacity } => {
-                write!(f, "SizeTooLarge: N*N={} exceeds T::BITS={}", n * n, capacity)
+                write!(
+                    f,
+                    "SizeTooLarge: N*N={} exceeds T::BITS={}",
+                    n * n,
+                    capacity
+                )
             }
             BitBoardError::IndexOutOfBounds { row, col } => {
                 write!(f, "IndexOutOfBounds: row={}, col={}", row, col)
@@ -42,7 +48,20 @@ impl<T, const N: usize> BitBoard<T, N>
 where
     T: PrimInt + Unsigned + Zero,
 {
+    /// Number of usable bits in the board (`N * N`).
+    const BOARD_BITS: usize = N * N;
+
+    #[inline]
+    fn mask() -> T {
+        if Self::BOARD_BITS == mem::size_of::<T>() * 8 {
+            !T::zero()
+        } else {
+            (T::one() << Self::BOARD_BITS) - T::one()
+        }
+    }
+
     /// Create a new empty bitboard (all bits cleared) without size check.
+    #[inline]
     pub fn new() -> Self {
         BitBoard { bits: T::zero() }
     }
@@ -50,7 +69,7 @@ where
     /// Fallible constructor: returns `Err(SizeTooLarge)` if N*N > T::BITS.
     pub fn try_new() -> Result<Self, BitBoardError> {
         let capacity = mem::size_of::<T>() * 8;
-        if N * N > capacity {
+        if Self::BOARD_BITS > capacity {
             Err(BitBoardError::SizeTooLarge { n: N, capacity })
         } else {
             Ok(BitBoard { bits: T::zero() })
@@ -98,17 +117,14 @@ where
         Ok(())
     }
 
-    /// Sets all N*N lower bits to 1 (fills the board).
+    /// Sets all board bits to `1`.
+    #[inline]
     pub fn fill(&mut self) {
-        let mask = if N * N == mem::size_of::<T>() * 8 {
-            !T::zero()
-        } else {
-            (T::one() << (N * N)) - T::one()
-        };
-        self.bits = mask;
+        self.bits = Self::mask();
     }
 
-    /// Clears all bits to 0.
+    /// Clears all bits to `0`.
+    #[inline]
     pub fn clear_all(&mut self) {
         self.bits = T::zero();
     }
@@ -123,21 +139,21 @@ where
     }
 
     /// Consumes the board and returns the raw integer.
+    #[inline]
     pub fn into_raw(self) -> T {
         self.bits
     }
 
     /// Creates a bitboard from the raw integer, masking out upper bits.
+    #[inline]
     pub fn from_raw(raw: T) -> Self {
-        let mask = if N * N == mem::size_of::<T>() * 8 {
-            !T::zero()
-        } else {
-            (T::one() << (N * N)) - T::one()
-        };
-        BitBoard { bits: raw & mask }
+        BitBoard {
+            bits: raw & Self::mask(),
+        }
     }
 
     /// Creates a bitboard from an iterator over `(row, col)` positions.
+    #[inline]
     pub fn from_iter<I>(iter: I) -> Result<Self, BitBoardError>
     where
         I: IntoIterator<Item = (usize, usize)>,
@@ -150,8 +166,12 @@ where
     }
 
     /// Iterator over the set bits of the board.
+    #[inline]
     pub fn iter_set_bits(&self) -> SetBits<'_, T, N> {
-        SetBits { board: self, idx: 0 }
+        SetBits {
+            board: self,
+            idx: 0,
+        }
     }
 }
 
@@ -159,6 +179,7 @@ impl<T, const N: usize> Default for BitBoard<T, N>
 where
     T: PrimInt + Unsigned + Zero,
 {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -199,13 +220,16 @@ where
                 };
                 write!(f, "{} ", bit)?;
             }
-            if r + 1 < N { writeln!(f)?; }
+            if r + 1 < N {
+                writeln!(f)?;
+            }
         }
         Ok(())
     }
 }
 
 /// Iterator over the set bits of a bitboard.
+#[derive(Clone, Copy)]
 pub struct SetBits<'a, T, const N: usize>
 where
     T: PrimInt + Unsigned + Zero,
@@ -219,6 +243,7 @@ where
     T: PrimInt + Unsigned + Zero,
 {
     type Item = (usize, usize);
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         while self.idx < N * N {
             let idx = self.idx;
@@ -280,6 +305,7 @@ where
     T: PrimInt + Unsigned + Zero,
 {
     type Output = Self;
+    #[inline]
     fn not(self) -> Self {
         Self::from_raw(!self.bits)
     }
@@ -289,6 +315,7 @@ impl<T, const N: usize> BitAndAssign for BitBoard<T, N>
 where
     T: PrimInt + Unsigned + Zero,
 {
+    #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         self.bits = self.bits & rhs.bits;
     }
@@ -298,6 +325,7 @@ impl<T, const N: usize> BitOrAssign for BitBoard<T, N>
 where
     T: PrimInt + Unsigned + Zero,
 {
+    #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         self.bits = self.bits | rhs.bits;
     }
@@ -307,6 +335,7 @@ impl<T, const N: usize> BitXorAssign for BitBoard<T, N>
 where
     T: PrimInt + Unsigned + Zero,
 {
+    #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
         self.bits = self.bits ^ rhs.bits;
     }
