@@ -24,7 +24,6 @@ impl ShipState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PlacedShip {
     ship: Ship<u128, { BOARD_SIZE as usize }>,
-    mask: BitBoard<u128, { BOARD_SIZE as usize }>,
 }
 
 pub struct BoardState {
@@ -65,7 +64,8 @@ impl BoardState {
             return Err(BoardError::InvalidIndex);
         }
         let def = SHIPS[ship_index];
-        let (ship, mask) = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orientation, row, col)?;
+        let ship = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orientation, row, col)?;
+        let mask = ship.mask();
         // ensure no overlap
         if (self.ship_map & mask).count_ones() > 0 {
             return Err(BoardError::ShipOverlaps);
@@ -73,7 +73,7 @@ impl BoardState {
         // record placement
         self.ship_map = self.ship_map | mask;
         self.ship_states[ship_index].name = def.name();
-        self.ships[ship_index] = Some(PlacedShip { ship, mask });
+        self.ships[ship_index] = Some(PlacedShip { ship });
         Ok(())
     }
 
@@ -123,8 +123,8 @@ impl BoardState {
             // determine which ship was hit
             for (i, slot) in self.ships.iter_mut().enumerate() {
                 if let Some(ps) = slot {
-                    if ps.mask.get(row, col).unwrap_or(false) {
-                        ps.ship.register_hit(row, col, &ps.mask);
+                    if ps.ship.mask().get(row, col).unwrap_or(false) {
+                        ps.ship.register_hit(row, col);
                         if ps.ship.is_sunk() && !self.ship_states[i].sunk {
                             self.ship_states[i].sunk = true;
                             return Ok(GuessResult::Sink(ps.ship.ship_type().name()));
