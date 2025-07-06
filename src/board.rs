@@ -102,35 +102,21 @@ impl BoardState {
 
     /// Process a guess at (row, col), marking hits/misses and reporting result.
     pub fn guess(&mut self, row: usize, col: usize) -> Result<GuessResult, BoardError> {
+        // bounds check via BitBoard::get
+        let already_hit = self.hits.get(row, col)?;
+        let already_miss = self.misses.get(row, col)?;
+
         // prevent duplicates
-        if self.hits.get(row, col).unwrap_or(false)
-            || self.misses.get(row, col).unwrap_or(false)
-        {
+        if already_hit || already_miss {
             return Err(BoardError::AlreadyGuessed);
         }
-        // hit detection
-        if self.ship_map.get(row, col).unwrap_or(false) {
-            self.hits = self.hits | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                (1u128 << (row * (BOARD_SIZE as usize) + col)),
-            );
-            // determine which ship
-            for (i, def) in SHIPS.iter().enumerate() {
-                // reconstruct mask for this ship placement
-                // assume single placement per ship in ship_map
-                let mask = Ship::<u128, { BOARD_SIZE as usize }>::new(*def, Orientation::Horizontal, row, col)
-                    .map(|(_, m)| m)
-                    .unwrap_or(BitBoard::new());
-                if mask.get(row, col).unwrap_or(false) {
-                    // register hit in state
-                    // no hits tracked per ship in this simple model
-                    return Ok(GuessResult::Hit);
-                }
-            }
+
+        // hit detection after successful bounds verification
+        if self.ship_map.get(row, col)? {
+            self.hits.set(row, col)?;
             Ok(GuessResult::Hit)
         } else {
-            self.misses = self.misses | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                (1u128 << (row * (BOARD_SIZE as usize) + col)),
-            );
+            self.misses.set(row, col)?;
             Ok(GuessResult::Miss)
         }
     }
