@@ -65,8 +65,7 @@ impl BoardState {
             return Err(BoardError::InvalidIndex);
         }
         let def = SHIPS[ship_index];
-        let (ship, mask) = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orientation, row, col)
-            .map_err(|_| BoardError::ShipOutOfBounds)?;
+        let (_ship, mask) = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orientation, row, col)?;
         // ensure no overlap
         if (self.ship_map & mask).count_ones() > 0 {
             return Err(BoardError::ShipOverlaps);
