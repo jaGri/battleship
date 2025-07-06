@@ -7,6 +7,8 @@ use crate::ship::{Orientation, Ship};
 use core::fmt;
 use rand::Rng;
 
+type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
+
 /// Tracks per-ship state: name and sunk flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShipState {
@@ -29,9 +31,9 @@ struct PlacedShip {
 pub struct BoardState {
     ship_states: [ShipState; NUM_SHIPS as usize],
     ships: [Option<PlacedShip>; NUM_SHIPS as usize],
-    ship_map: BitBoard<u128, { BOARD_SIZE as usize }>,
-    hits: BitBoard<u128, { BOARD_SIZE as usize }>,
-    misses: BitBoard<u128, { BOARD_SIZE as usize }>,
+    ship_map: BB,
+    hits: BB,
+    misses: BB,
 }
 
 impl BoardState {
@@ -42,7 +44,7 @@ impl BoardState {
             let def = SHIPS[i];
             ShipState::new(def.name())
         });
-        let empty = BitBoard::<u128, { BOARD_SIZE as usize }>::new();
+        let empty = BB::new();
         BoardState {
             ship_states,
             ships: [None; NUM_SHIPS as usize],
@@ -50,6 +52,21 @@ impl BoardState {
             hits: empty,
             misses: empty,
         }
+    }
+
+    /// Immutable view of ship states.
+    pub fn ship_states(&self) -> &[ShipState] {
+        &self.ship_states
+    }
+
+    /// Returns `true` when all ships are sunk.
+    pub fn all_sunk(&self) -> bool {
+        self.ship_states.iter().all(|s| s.sunk)
+    }
+
+    /// Board occupancy mask of all ships.
+    pub fn ship_map(&self) -> BB {
+        self.ship_map
     }
 
     /// Place a single ship by index at (row, col) and orientation.
@@ -63,11 +80,14 @@ impl BoardState {
         if ship_index >= NUM_SHIPS as usize {
             return Err(BoardError::InvalidIndex);
         }
+        if self.ships[ship_index].is_some() {
+            return Err(BoardError::ShipAlreadyPlaced);
+        }
         let def = SHIPS[ship_index];
         let ship = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orientation, row, col)?;
         let mask = ship.mask();
         // ensure no overlap
-        if (self.ship_map & mask).count_ones() > 0 {
+        if !(self.ship_map & mask).is_empty() {
             return Err(BoardError::ShipOverlaps);
         }
         // record placement
@@ -81,7 +101,12 @@ impl BoardState {
     pub fn place_random<R: Rng>(&mut self, rng: &mut R) -> Result<(), BoardError> {
         for i in 0..NUM_SHIPS as usize {
             let def = SHIPS[i];
+            let mut attempts = 0;
             loop {
+                if attempts > 100 {
+                    return Err(BoardError::UnableToPlaceShip);
+                }
+                attempts += 1;
                 let orient = if rng.random() {
                     Orientation::Horizontal
                 } else {
@@ -110,15 +135,12 @@ impl BoardState {
     /// Process a guess at (row, col), marking hits/misses and reporting result.
     pub fn guess(&mut self, row: usize, col: usize) -> Result<GuessResult, BoardError> {
         // prevent duplicates
-        if self.hits.get(row, col).unwrap_or(false) || self.misses.get(row, col).unwrap_or(false) {
+        if self.hits.get(row, col)? || self.misses.get(row, col)? {
             return Err(BoardError::AlreadyGuessed);
         }
         // hit detection
-        if self.ship_map.get(row, col).unwrap_or(false) {
-            let bit = BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                1u128 << (row * (BOARD_SIZE as usize) + col),
-            );
-            self.hits = self.hits | bit;
+        if self.ship_map.get(row, col)? {
+            self.hits.set(row, col)?;
 
             // determine which ship was hit
             for (i, slot) in self.ships.iter_mut().enumerate() {
@@ -136,10 +158,7 @@ impl BoardState {
             // should have found a ship; fallback
             Ok(GuessResult::Hit)
         } else {
-            self.misses = self.misses
-                | BitBoard::<u128, { BOARD_SIZE as usize }>::from_raw(
-                    1u128 << (row * (BOARD_SIZE as usize) + col),
-                );
+            self.misses.set(row, col)?;
             Ok(GuessResult::Miss)
         }
     }
