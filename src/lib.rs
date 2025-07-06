@@ -5,7 +5,7 @@ mod ship;
 mod config;
 //mod interface_cli;
 
-pub use bitboard::{BitBoard};
+pub use bitboard::{BitBoard, BitBoardError};
 pub use common::*;
 pub use board::*;
 pub use ship::*;
