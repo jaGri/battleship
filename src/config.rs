@@ -9,3 +9,6 @@ pub const SHIPS: [ShipDef; NUM_SHIPS] = [
     ShipDef::new("Submarine", 3),
     ShipDef::new("Destroyer", 2),
 ];
+
+/// Total number of ship segments used in the standard configuration.
+pub const TOTAL_SHIP_CELLS: usize = 5 + 4 + 3 + 3 + 2;

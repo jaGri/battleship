@@ -78,7 +78,7 @@ impl ShipDef {
     }
 
     /// Ship's length.
-    pub fn length(&self) -> usize {
+    pub const fn length(&self) -> usize {
         self.length
     }
 }
