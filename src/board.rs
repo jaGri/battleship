@@ -67,6 +67,16 @@ impl Board {
         self.ship_map
     }
 
+    /// Bitboard of hits recorded on this board.
+    pub fn hits(&self) -> BB {
+        self.hits
+    }
+
+    /// Bitboard of misses recorded on this board.
+    pub fn misses(&self) -> BB {
+        self.misses
+    }
+
     /// Place a single ship by index at (row, col) and orientation.
     pub fn place(
         &mut self,
