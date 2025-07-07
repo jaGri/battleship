@@ -7,20 +7,6 @@ pub struct InterfaceCli<'a> {
     pub opponent_board: &'a Board,
 }
 
-impl fmt::Display for BoardError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = match self {
-            BoardError::NameNotFound => "Unknown ship name",
-            BoardError::InvalidIndex => "Invalid ship index",
-            BoardError::ShipAlreadyPlaced => "Ship already placed",
-            BoardError::ShipOverlaps => "Ship overlaps with another ship",
-            BoardError::BitBoardError(e) => &e.to_string(),
-            BoardError::AlreadyGuessed => "Guess already made at this position",
-            BoardError::UnableToPlaceShip => "Unable to place ship",
-        };
-        write!(f, "{}", msg)
-    }
-}
 
 impl <'a> InterfaceCli<'a> {
     pub fn new(my_board: &'a Board, opponent_board: &'a Board) -> Self {
