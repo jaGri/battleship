@@ -13,7 +13,6 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoardState {
     pub ship_states: [ShipState; NUM_SHIPS as usize],
-    pub ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS as usize],
     pub ship_map: BB,
     pub hits: BB,
     pub misses: BB,
@@ -22,7 +21,6 @@ pub struct BoardState {
 /// Main board state: ship placements, hits, misses.
 
 pub struct Board {
-    ship_states: [ShipState; NUM_SHIPS as usize],
     ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS as usize],
     ship_map: BB,
     hits: BB,
@@ -32,14 +30,8 @@ pub struct Board {
 impl Board {
     /// Create an empty board state (no ships placed).
     pub fn new() -> Self {
-        // initialize ship states from config names
-        let ship_states = core::array::from_fn(|i: usize| {
-            let def = SHIPS[i];
-            ShipState::new(def.name())
-        });
         let empty = BB::new();
         Board {
-            ship_states,
             ships: [None; NUM_SHIPS as usize],
             ship_map: empty,
             hits: empty,
@@ -47,14 +39,27 @@ impl Board {
         }
     }
 
-    /// Immutable view of ship states.
-    pub fn ship_states(&self) -> &[ShipState] {
-        &self.ship_states
+    /// Returns the public state of each ship.
+    pub fn ship_states(&self) -> [ShipState; NUM_SHIPS as usize] {
+        core::array::from_fn(|i| match &self.ships[i] {
+            Some(s) => ShipState {
+                name: s.ship_type().name(),
+                sunk: s.is_sunk(),
+                position: Some((s.origin().0, s.origin().1, s.orientation())),
+            },
+            None => ShipState::new(SHIPS[i].name()),
+        })
     }
 
     /// Returns `true` when all ships are sunk.
     pub fn all_sunk(&self) -> bool {
-        self.ship_states.iter().all(|s| s.sunk)
+        self.ships.iter().enumerate().all(|(i, s)| match s {
+            Some(ship) => ship.is_sunk(),
+            None => {
+                let _ = SHIPS[i];
+                false
+            }
+        })
     }
 
     /// Board occupancy mask of all ships.
@@ -85,7 +90,6 @@ impl Board {
         }
         // record placement
         self.ship_map = self.ship_map | mask;
-        self.ship_states[ship_index].name = def.name();
         self.ships[ship_index] = Some(ship);
         Ok(())
     }
@@ -140,12 +144,12 @@ impl Board {
             self.hits.set(row, col)?;
 
             // determine which ship was hit
-            for (i, ship_opt) in self.ships.iter_mut().enumerate() {
+            for ship_opt in self.ships.iter_mut() {
                 if let Some(ship) = ship_opt {
                     if ship.mask().get(row, col).unwrap_or(false) {
+                        let was_sunk = ship.is_sunk();
                         ship.guess(row, col);
-                        if ship.is_sunk() && !self.ship_states[i].sunk {
-                            self.ship_states[i].sunk = true;
+                        if ship.is_sunk() && !was_sunk {
                             return Ok(GuessResult::Sink(ship.ship_type().name()));
                         }
                         return Ok(GuessResult::Hit);
@@ -165,22 +169,16 @@ impl fmt::Debug for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "Board {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  states: {:?},\n  ships: {:?}\n}}",
-            self.ship_map,
-            self.hits,
-            self.misses,
-            self.ship_states,
-            self.ships
+            "Board {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  ships: {:?}\n}}",
+            self.ship_map, self.hits, self.misses, self.ships
         )
     }
 }
 
 impl From<&Board> for BoardState {
     fn from(b: &Board) -> Self {
-        let ships = core::array::from_fn(|i| b.ships[i]);
         BoardState {
-            ship_states: b.ship_states,
-            ships,
+            ship_states: b.ship_states(),
             ship_map: b.ship_map,
             hits: b.hits,
             misses: b.misses,
@@ -190,13 +188,19 @@ impl From<&Board> for BoardState {
 
 impl From<BoardState> for Board {
     fn from(state: BoardState) -> Self {
-        let ships = core::array::from_fn(|i| state.ships[i]);
-        Board {
-            ship_states: state.ship_states,
-            ships,
-            ship_map: state.ship_map,
-            hits: state.hits,
-            misses: state.misses,
+        let mut board = Board::new();
+        board.ship_map = state.ship_map;
+        board.hits = state.hits;
+        board.misses = state.misses;
+        for i in 0..NUM_SHIPS as usize {
+            let def = SHIPS[i];
+            if let Some(ship) =
+                Ship::<u128, { BOARD_SIZE as usize }>::from_state(&state.ship_states[i], def)
+                    .unwrap()
+            {
+                board.ships[i] = Some(ship);
+            }
         }
+        board
     }
 }
