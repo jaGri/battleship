@@ -2,7 +2,7 @@ use crate::{
     board::{Board, BoardState},
     bitboard::BitBoard,
     common::{BoardError, GuessResult},
-    config::{BOARD_SIZE, TOTAL_SHIP_CELLS},
+    config::{BOARD_SIZE, TOTAL_SHIP_CELLS, SHIPS, NUM_SHIPS},
 };
 
 /// Bitboard type used for game state tracking.
@@ -36,6 +36,7 @@ pub struct GameEngine {
     guess_hits: BB,
     guess_misses: BB,
     enemy_remaining: usize,
+    enemy_ships_remaining: [bool; NUM_SHIPS as usize],
 }
 
 impl GameEngine {
@@ -46,6 +47,7 @@ impl GameEngine {
             guess_hits: BB::new(),
             guess_misses: BB::new(),
             enemy_remaining: TOTAL_SHIP_CELLS,
+            enemy_ships_remaining: [true; NUM_SHIPS as usize],
         }
     }
 
@@ -75,9 +77,18 @@ impl GameEngine {
             return Err(BoardError::AlreadyGuessed);
         }
         match result {
-            GuessResult::Hit | GuessResult::Sink(_) => {
+            GuessResult::Hit => {
                 self.guess_hits.set(row, col)?;
                 self.enemy_remaining = self.enemy_remaining.saturating_sub(1);
+            }
+            GuessResult::Sink(name) => {
+                self.guess_hits.set(row, col)?;
+                self.enemy_remaining = self.enemy_remaining.saturating_sub(1);
+                if let Some(idx) = SHIPS.iter().position(|s| s.name() == name) {
+                    self.enemy_ships_remaining[idx] = false;
+                } else {
+                    return Err(BoardError::NameNotFound);
+                }
             }
             GuessResult::Miss => {
                 self.guess_misses.set(row, col)?;
@@ -105,6 +116,7 @@ impl GameEngine {
             guess_hits: state.my_guesses.hits,
             guess_misses: state.my_guesses.misses,
             enemy_remaining,
+            enemy_ships_remaining: [true; NUM_SHIPS as usize],
         }
     }
 
@@ -117,6 +129,19 @@ impl GameEngine {
         } else {
             GameStatus::InProgress
         }
+    }
+
+    /// Lengths of enemy ships that have not yet been sunk. Entries are zero
+    /// for ships already sunk, maintaining fixed-size output for `no_std`
+    /// callers.
+    pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
+        let mut lens = [0usize; NUM_SHIPS as usize];
+        for (i, def) in SHIPS.iter().enumerate() {
+            if self.enemy_ships_remaining[i] {
+                lens[i] = def.length();
+            }
+        }
+        lens
     }
 }
 
