@@ -18,12 +18,44 @@ pub enum Orientation {
 pub struct ShipState {
     pub name: &'static str,
     pub sunk: bool,
+    pub position: Option<(usize, usize, Orientation)>,
 }
 
 impl ShipState {
     /// Create initial state for a ship.
     pub const fn new(name: &'static str) -> Self {
-        ShipState { name, sunk: false }
+        ShipState {
+            name,
+            sunk: false,
+            position: None,
+        }
+    }
+}
+
+impl<T, const N: usize> From<&Ship<T, N>> for ShipState
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    fn from(ship: &Ship<T, N>) -> Self {
+        ShipState {
+            name: ship.ship_type().name(),
+            sunk: ship.is_sunk(),
+            position: Some((ship.row, ship.col, ship.orientation)),
+        }
+    }
+}
+
+impl<T, const N: usize> Ship<T, N>
+where
+    T: PrimInt + Unsigned + Zero,
+{
+    /// Construct a ship from a [`ShipState`] if placement information is present.
+    pub fn from_state(state: &ShipState, def: ShipDef) -> Result<Option<Self>, BoardError> {
+        if let Some((row, col, orient)) = state.position {
+            Ok(Some(Ship::new(def, orient, row, col)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
