@@ -1,4 +1,4 @@
-use battleship::{AiPlayer, CliPlayer, GameEngine, GameStatus, Player};
+use battleship::{AiPlayer, CliPlayer, GameEngine, GameStatus, Player, print_player_view};
 use rand::thread_rng;
 
 fn main() {
@@ -14,6 +14,9 @@ fn main() {
         .expect("placement");
 
     loop {
+        // show current boards before taking a turn
+        print_player_view(&my_engine);
+
         // player turn
         let guess = cli.select_target(
             &mut rng,
@@ -26,6 +29,7 @@ fn main() {
             .record_guess(guess.0, guess.1, res)
             .expect("record");
         cli.handle_guess_result(guess, res);
+        print_player_view(&my_engine);
         if ai_engine.status() == GameStatus::Lost {
             println!("You won!");
             break;
@@ -43,6 +47,7 @@ fn main() {
             .record_guess(guess.0, guess.1, res)
             .expect("record");
         cli.handle_opponent_guess(guess, res);
+        print_player_view(&my_engine);
         if my_engine.status() == GameStatus::Lost {
             println!("You lost!");
             break;

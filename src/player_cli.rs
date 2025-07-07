@@ -8,6 +8,7 @@ use crate::{
     board::Board,
     common::GuessResult,
     config::{BOARD_SIZE, NUM_SHIPS, SHIPS},
+    GameEngine,
     BoardError,
 };
 use rand::Rng;
@@ -69,6 +70,37 @@ fn print_board(board: &Board, reveal: bool) {
     }
 }
 
+fn print_guess_board(hits: &BB, misses: &BB) {
+    std::print!("   ");
+    for c in 0..BOARD_SIZE as usize {
+        let ch = (b'A' + c as u8) as char;
+        std::print!(" {}", ch);
+    }
+    std::println!();
+    for r in 0..BOARD_SIZE as usize {
+        std::print!("{:2} ", r + 1);
+        for c in 0..BOARD_SIZE as usize {
+            let ch = if hits.get(r, c).unwrap_or(false) {
+                'X'
+            } else if misses.get(r, c).unwrap_or(false) {
+                'o'
+            } else {
+                '.'
+            };
+            std::print!(" {}", ch);
+        }
+        std::println!();
+    }
+}
+
+/// Display the opponent board (top) and the player's board (bottom).
+pub fn print_player_view(engine: &GameEngine) {
+    std::println!("Opponent board:");
+    print_guess_board(&engine.guess_hits(), &engine.guess_misses());
+    std::println!("\nYour board:");
+    print_board(engine.board(), true);
+}
+
 impl Player for CliPlayer {
     fn place_ships<R: Rng>(&mut self, rng: &mut R, board: &mut Board) -> Result<(), BoardError> {
         std::println!("Place your ships (e.g. A5 H). Enter 'r' for random placement.");
@@ -116,7 +148,8 @@ impl Player for CliPlayer {
     ) -> (usize, usize) {
         let (sr, sc) = ai::calc_pdf_and_guess(hits, misses, remaining, rng);
         loop {
-            std::print!("Enter guess (e.g. A5) [{}]: ", coord_to_string(sr, sc));
+            // Show probability-based suggestion in brackets
+            std::print!("Enter guess [{}]: ", coord_to_string(sr, sc));
             io::stdout().flush().unwrap();
             let mut line = String::new();
             io::stdin().read_line(&mut line).unwrap();

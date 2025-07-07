@@ -57,8 +57,10 @@ pub fn calc_pdf(
                     if !valid { continue; }
 
                     // simple likelihood: placements covering more observed hits
-                    // carry proportionally more weight
-                    let weight = 1.0 + n_hits as f64;
+                    // carry proportionally more weight. Heavily bias toward
+                    // coordinates adjacent to known hits so the suggested
+                    // guesses focus around partially discovered ships.
+                    let weight = 1.0 + 2.0 * n_hits as f64;
                     for k in 0..len {
                         let rr = r + if matches!(orient, Orientation::Vertical) { k } else {0};
                         let cc = c + if matches!(orient, Orientation::Horizontal) { k } else {0};
@@ -141,6 +143,8 @@ pub fn calc_pdf_and_guess<R: Rng + ?Sized>(
     rng: &mut R,
 ) -> (usize, usize) {
     let pdf = calc_pdf(hits, misses, lengths);
-    sample_pdf(&pdf, 1.0, rng)
+    // Lower temperature biases the sampling towards higher probability cells
+    // so suggestions hone in on likely ship locations.
+    sample_pdf(&pdf, 0.5, rng)
 }
 
