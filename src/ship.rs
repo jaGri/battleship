@@ -13,15 +13,29 @@ pub enum Orientation {
     Vertical,
 }
 
-/// Type of ship: name and length.
+/// Public state of a ship on the board used for serialization or UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShipType {
+pub struct ShipState {
+    pub name: &'static str,
+    pub sunk: bool,
+}
+
+impl ShipState {
+    /// Create initial state for a ship.
+    pub const fn new(name: &'static str) -> Self {
+        ShipState { name, sunk: false }
+    }
+}
+
+/// Definition of a ship: name and length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShipDef {
     name: &'static str,
     length: usize,
 }
 
-impl ShipType {
-    /// Create a new ship type.
+impl ShipDef {
+    /// Create a new ship definition.
     pub const fn new(name: &'static str, length: usize) -> Self {
         Self { name, length }
     }
@@ -43,7 +57,7 @@ pub struct Ship<T, const N: usize>
 where
     T: PrimInt + Unsigned + Zero,
 {
-    ship_type: ShipType,
+    ship_type: ShipDef,
     orientation: Orientation,
     row: usize,
     col: usize,
@@ -58,7 +72,7 @@ where
     /// Place a ship at (`row`, `col`) with `orientation`.
     /// Returns the newly constructed ship.
     pub fn new(
-        ship_type: ShipType,
+        ship_type: ShipDef,
         orientation: Orientation,
         row: usize,
         col: usize,
@@ -112,7 +126,7 @@ where
     }
 
     /// Ship's type.
-    pub fn ship_type(&self) -> ShipType {
+    pub fn ship_type(&self) -> ShipDef {
         self.ship_type
     }
 

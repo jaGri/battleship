@@ -1,4 +1,4 @@
-use battleship::{BitBoard, Orientation, BoardState};
+use battleship::{BitBoard, Orientation, Board};
 
 fn main() {
     // Demonstrate basic bitboard usage
@@ -17,7 +17,7 @@ fn main() {
     println!("{}\n", board0 & board1);
 
     // Demonstrate board and ship placement
-    let mut state = BoardState::new();
+    let mut state = Board::new();
     state.place(0, 0, 0, Orientation::Horizontal).unwrap();
     state.place(1, 2, 2, Orientation::Vertical).unwrap();
     println!("Initial state: {:?}", state);
