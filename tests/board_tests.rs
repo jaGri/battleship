@@ -1,10 +1,10 @@
-use battleship::{BoardError, BoardState, GuessResult, Orientation, NUM_SHIPS, SHIPS};
+use battleship::{BoardError, Board, GuessResult, Orientation, NUM_SHIPS, SHIPS};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 #[test]
 fn test_manual_place_and_guess_sink() {
-    let mut board = BoardState::new();
+    let mut board = Board::new();
     board.place(0, 0, 0, Orientation::Horizontal).unwrap();
 
     for c in 0..SHIPS[0].length() - 1 {
@@ -26,7 +26,7 @@ fn test_manual_place_and_guess_sink() {
 
 #[test]
 fn test_place_random_no_overlap() {
-    let mut board = BoardState::new();
+    let mut board = Board::new();
     let mut rng = SmallRng::seed_from_u64(42);
     let ship_index = 0; // Carrier
     let (r, c, orient) = board.random_placement(&mut rng, ship_index).unwrap();
@@ -37,7 +37,7 @@ fn test_place_random_no_overlap() {
 
 #[test]
 fn test_place_random_all_ships_no_overlap() {
-    let mut board = BoardState::new();
+    let mut board = Board::new();
     let mut rng = SmallRng::seed_from_u64(42);
 
     let mut expected_bits = 0;

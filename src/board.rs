@@ -3,23 +3,20 @@
 use crate::bitboard::BitBoard;
 use crate::common::{BoardError, GuessResult};
 use crate::config::{BOARD_SIZE, NUM_SHIPS, SHIPS};
-use crate::ship::{Orientation, Ship};
+use crate::ship::{Orientation, Ship, ShipState};
 use core::fmt;
 use rand::Rng;
 
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
-/// Tracks per-ship state: name and sunk flag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShipState {
-    pub name: &'static str,
-    pub sunk: bool,
-}
-impl ShipState {
-    /// Create initial state for a ship.
-    pub const fn new(name: &'static str) -> Self {
-        ShipState { name, sunk: false }
-    }
+/// Serializable board state for syncing or saving games.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BoardState {
+    pub ship_states: [ShipState; NUM_SHIPS as usize],
+    pub ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS as usize],
+    pub ship_map: BB,
+    pub hits: BB,
+    pub misses: BB,
 }
 
 /// Main board state: ship placements, hits, misses.
@@ -28,7 +25,7 @@ struct PlacedShip {
     ship: Ship<u128, { BOARD_SIZE as usize }>,
 }
 
-pub struct BoardState {
+pub struct Board {
     ship_states: [ShipState; NUM_SHIPS as usize],
     ships: [Option<PlacedShip>; NUM_SHIPS as usize],
     ship_map: BB,
@@ -36,7 +33,7 @@ pub struct BoardState {
     misses: BB,
 }
 
-impl BoardState {
+impl Board {
     /// Create an empty board state (no ships placed).
     pub fn new() -> Self {
         // initialize ship states from config names
@@ -45,7 +42,7 @@ impl BoardState {
             ShipState::new(def.name())
         });
         let empty = BB::new();
-        BoardState {
+        Board {
             ship_states,
             ships: [None; NUM_SHIPS as usize],
             ship_map: empty,
@@ -168,16 +165,42 @@ impl BoardState {
     }
 }
 
-impl fmt::Debug for BoardState {
+impl fmt::Debug for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "BoardState {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  states: {:?},\n  ships: {:?}\n}}",
+            "Board {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  states: {:?},\n  ships: {:?}\n}}",
             self.ship_map,
             self.hits,
             self.misses,
             self.ship_states,
             self.ships
         )
+    }
+}
+
+impl From<&Board> for BoardState {
+    fn from(b: &Board) -> Self {
+        let ships = core::array::from_fn(|i| b.ships[i].map(|ps| ps.ship));
+        BoardState {
+            ship_states: b.ship_states,
+            ships,
+            ship_map: b.ship_map,
+            hits: b.hits,
+            misses: b.misses,
+        }
+    }
+}
+
+impl From<BoardState> for Board {
+    fn from(state: BoardState) -> Self {
+        let ships = core::array::from_fn(|i| state.ships[i].map(|s| PlacedShip { ship: s }));
+        Board {
+            ship_states: state.ship_states,
+            ships,
+            ship_map: state.ship_map,
+            hits: state.hits,
+            misses: state.misses,
+        }
     }
 }
