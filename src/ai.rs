@@ -60,7 +60,7 @@ pub fn calc_pdf(
                     // carry proportionally more weight. Heavily bias toward
                     // coordinates adjacent to known hits so the suggested
                     // guesses focus around partially discovered ships.
-                    let weight = 1.0 + 2.0 * n_hits as f64;
+                    let weight = 2f64.powi(n_hits as i32);
                     for k in 0..len {
                         let rr = r + if matches!(orient, Orientation::Vertical) { k } else {0};
                         let cc = c + if matches!(orient, Orientation::Horizontal) { k } else {0};
