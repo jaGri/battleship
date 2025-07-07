@@ -13,7 +13,6 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoardState {
     pub ship_states: [ShipState; NUM_SHIPS as usize],
-    pub ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS as usize],
     pub ship_map: BB,
     pub hits: BB,
     pub misses: BB,
@@ -42,11 +41,13 @@ impl Board {
 
     /// Returns the public state of each ship.
     pub fn ship_states(&self) -> [ShipState; NUM_SHIPS as usize] {
-        core::array::from_fn(|i| {
-            match &self.ships[i] {
-                Some(s) => ShipState { name: s.ship_type().name(), sunk: s.is_sunk() },
-                None => ShipState::new(SHIPS[i].name()),
-            }
+        core::array::from_fn(|i| match &self.ships[i] {
+            Some(s) => ShipState {
+                name: s.ship_type().name(),
+                sunk: s.is_sunk(),
+                position: Some((s.origin().0, s.origin().1, s.orientation())),
+            },
+            None => ShipState::new(SHIPS[i].name()),
         })
     }
 
@@ -169,20 +170,15 @@ impl fmt::Debug for Board {
         writeln!(
             f,
             "Board {{\n  ship_map: {:?},\n  hits: {:?},\n  misses: {:?},\n  ships: {:?}\n}}",
-            self.ship_map,
-            self.hits,
-            self.misses,
-            self.ships
+            self.ship_map, self.hits, self.misses, self.ships
         )
     }
 }
 
 impl From<&Board> for BoardState {
     fn from(b: &Board) -> Self {
-        let ships = core::array::from_fn(|i| b.ships[i]);
         BoardState {
             ship_states: b.ship_states(),
-            ships,
             ship_map: b.ship_map,
             hits: b.hits,
             misses: b.misses,
@@ -192,12 +188,19 @@ impl From<&Board> for BoardState {
 
 impl From<BoardState> for Board {
     fn from(state: BoardState) -> Self {
-        let ships = core::array::from_fn(|i| state.ships[i]);
-        Board {
-            ships,
-            ship_map: state.ship_map,
-            hits: state.hits,
-            misses: state.misses,
+        let mut board = Board::new();
+        board.ship_map = state.ship_map;
+        board.hits = state.hits;
+        board.misses = state.misses;
+        for i in 0..NUM_SHIPS as usize {
+            let def = SHIPS[i];
+            if let Some(ship) =
+                Ship::<u128, { BOARD_SIZE as usize }>::from_state(&state.ship_states[i], def)
+                    .unwrap()
+            {
+                board.ships[i] = Some(ship);
+            }
         }
+        board
     }
 }

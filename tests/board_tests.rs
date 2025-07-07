@@ -1,4 +1,5 @@
-use battleship::{BoardError, Board, GuessResult, Orientation, NUM_SHIPS, SHIPS};
+use battleship::{Board, BoardError, GuessResult, Orientation, BOARD_SIZE, NUM_SHIPS, SHIPS};
+use battleship::{BoardState, Ship};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -52,4 +53,33 @@ fn test_place_random_all_ships_no_overlap() {
         expected_bits,
         "all ships should be placed without overlap"
     );
+}
+
+#[test]
+fn test_board_state_roundtrip() {
+    let mut board = Board::new();
+    board.place(1, 2, 2, Orientation::Vertical).unwrap();
+    board.guess(2, 2).unwrap();
+
+    let state = BoardState::from(&board);
+    let mut board2: Board = state.into();
+
+    assert_eq!(board2.guess(2, 2).unwrap_err(), BoardError::AlreadyGuessed);
+    assert_eq!(
+        board2.ship_states()[1].position,
+        Some((2, 2, Orientation::Vertical))
+    );
+}
+
+#[test]
+fn test_ship_state_conversion() {
+    let mut board = Board::new();
+    board.place(2, 4, 1, Orientation::Horizontal).unwrap();
+    let states = board.ship_states();
+    let def = SHIPS[2];
+    let ship = Ship::<u128, { BOARD_SIZE as usize }>::from_state(&states[2], def)
+        .unwrap()
+        .unwrap();
+    assert_eq!(ship.origin(), (4, 1));
+    assert_eq!(ship.orientation(), Orientation::Horizontal);
 }
