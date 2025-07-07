@@ -1,27 +1,51 @@
-use battleship::{BitBoard, Orientation, Board};
+use battleship::{AiPlayer, CliPlayer, GameEngine, GameStatus, Player};
+use rand::thread_rng;
 
 fn main() {
-    // Demonstrate basic bitboard usage
-    let mut board0 = BitBoard::<u128, 10>::new();
-    for i in 0..5 { board0.set(1, 1 + i).unwrap(); }
-    for i in 0..4 { board0.set(3 + i, 1).unwrap(); }
+    let mut rng = thread_rng();
+    let mut cli = CliPlayer::new();
+    let mut ai = AiPlayer::new();
+    let mut my_engine = GameEngine::new();
+    let mut ai_engine = GameEngine::new();
 
-    let mut board1 = BitBoard::<u128, 10>::new();
-    for i in 0..5 { board1.set(1 + i, 1).unwrap(); }
-    for i in 0..3 { board1.set(9, 5 + i).unwrap(); }
+    cli.place_ships(&mut rng, my_engine.board_mut())
+        .expect("placement");
+    ai.place_ships(&mut rng, ai_engine.board_mut())
+        .expect("placement");
 
-    println!("{}\n", board0);
-    println!("{}\n", board1);
-    println!("{}\n", board0 | board1);
-    println!("intersects: {}\n", !(board0 & board1).is_empty());
-    println!("{}\n", board0 & board1);
+    loop {
+        // player turn
+        let guess = cli.select_target(
+            &mut rng,
+            &my_engine.guess_hits(),
+            &my_engine.guess_misses(),
+            &my_engine.enemy_ship_lengths_remaining(),
+        );
+        let res = ai_engine.opponent_guess(guess.0, guess.1).expect("guess");
+        my_engine
+            .record_guess(guess.0, guess.1, res)
+            .expect("record");
+        cli.handle_guess_result(guess, res);
+        if ai_engine.status() == GameStatus::Lost {
+            println!("You won!");
+            break;
+        }
 
-    // Demonstrate board and ship placement
-    let mut state = Board::new();
-    state.place(0, 0, 0, Orientation::Horizontal).unwrap();
-    state.place(1, 2, 2, Orientation::Vertical).unwrap();
-    println!("Initial state: {:?}", state);
-    let result = state.guess(0, 0).unwrap();
-    println!("Guess (0,0): {:?}", result);
-    println!("Updated state: {:?}", state);
+        // ai turn
+        let guess = ai.select_target(
+            &mut rng,
+            &ai_engine.guess_hits(),
+            &ai_engine.guess_misses(),
+            &ai_engine.enemy_ship_lengths_remaining(),
+        );
+        let res = my_engine.opponent_guess(guess.0, guess.1).expect("guess");
+        ai_engine
+            .record_guess(guess.0, guess.1, res)
+            .expect("record");
+        cli.handle_opponent_guess(guess, res);
+        if my_engine.status() == GameStatus::Lost {
+            println!("You lost!");
+            break;
+        }
+    }
 }

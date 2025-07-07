@@ -1,8 +1,8 @@
 use crate::{
-    board::{Board, BoardState},
     bitboard::BitBoard,
+    board::{Board, BoardState},
     common::{BoardError, GuessResult},
-    config::{BOARD_SIZE, TOTAL_SHIP_CELLS, SHIPS, NUM_SHIPS},
+    config::{BOARD_SIZE, NUM_SHIPS, SHIPS, TOTAL_SHIP_CELLS},
 };
 
 /// Bitboard type used for game state tracking.
@@ -59,6 +59,16 @@ impl GameEngine {
     /// Immutable reference to the player's board.
     pub fn board(&self) -> &Board {
         &self.board
+    }
+
+    /// Bitboard of our successful guesses on the opponent board.
+    pub fn guess_hits(&self) -> BB {
+        self.guess_hits
+    }
+
+    /// Bitboard of our missed guesses on the opponent board.
+    pub fn guess_misses(&self) -> BB {
+        self.guess_misses
     }
 
     /// Handle an opponent guess on the player's board.
@@ -144,4 +154,3 @@ impl GameEngine {
         lens
     }
 }
-
