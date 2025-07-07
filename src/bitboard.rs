@@ -76,7 +76,7 @@ where
         }
     }
 
-    /// Returns the number of set bits (occupied cells).
+    /// Returns the number of set bits
     pub fn count_ones(&self) -> usize {
         self.bits.count_ones() as usize
     }
@@ -114,7 +114,7 @@ where
         self.check_bounds(row, col)?;
         let idx = row * N + col;
         self.bits = self.bits ^ (T::one() << idx);
-        Ok(())
+        Ok(())  
     }
 
     /// Sets all board bits to `1`.

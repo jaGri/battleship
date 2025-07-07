@@ -1,4 +1,4 @@
-use battleship::{BoardError, BoardState, GuessResult, Orientation, SHIPS};
+use battleship::{BoardError, BoardState, GuessResult, Orientation, NUM_SHIPS, SHIPS};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -28,7 +28,28 @@ fn test_manual_place_and_guess_sink() {
 fn test_place_random_no_overlap() {
     let mut board = BoardState::new();
     let mut rng = SmallRng::seed_from_u64(42);
-    board.place_random(&mut rng).unwrap();
-    let total: usize = SHIPS.iter().map(|s| s.length()).sum();
-    assert_eq!(board.ship_map().count_ones(), total);
+    let ship_index = 0; // Carrier
+    let (r, c, orient) = board.random_placement(&mut rng, ship_index).unwrap();
+    board.place(ship_index, r, c, orient).unwrap();
+    let expected = SHIPS[ship_index].length();
+    assert_eq!(board.ship_map().count_ones(), expected);
+}
+
+#[test]
+fn test_place_random_all_ships_no_overlap() {
+    let mut board = BoardState::new();
+    let mut rng = SmallRng::seed_from_u64(42);
+
+    let mut expected_bits = 0;
+    for i in 0..NUM_SHIPS as usize {
+        let (r, c, orient) = board.random_placement(&mut rng, i).unwrap();
+        board.place(i, r, c, orient).unwrap();
+        expected_bits += SHIPS[i].length();
+    }
+
+    assert_eq!(
+        board.ship_map().count_ones(),
+        expected_bits,
+        "all ships should be placed without overlap"
+    );
 }

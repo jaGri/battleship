@@ -31,8 +31,9 @@ pub enum BoardError {
     /// Unable to place ship (random or manual placement failed).
     UnableToPlaceShip,
     // Ship out of bounds
-    ShipOutOfBounds
-}
+    ShipOutOfBounds,
+    /// Unknown ship hit (should not happen if all ships are placed correctly).
+    UnknownShipHit,}
 
 impl From<BitBoardError> for BoardError {
     fn from(err: BitBoardError) -> Self {
@@ -50,6 +51,7 @@ impl core::fmt::Display for BoardError {
             BoardError::AlreadyGuessed => write!(f, "Guess was already made at this position"),
             BoardError::UnableToPlaceShip => write!(f, "Unable to place ship"),
             BoardError::ShipOutOfBounds => write!(f, "Ship placement is out of bounds"),
+            BoardError::UnknownShipHit => write!(f, "Hit on an unknown ship segment"),
         }
     }
 }

@@ -97,7 +97,7 @@ where
 
     /// Register a hit at (`row`, `col`) using an occupancy mask.
     /// Returns `true` if it was a hit and records it.
-    pub fn register_hit(&mut self, row: usize, col: usize) -> bool {
+    pub fn guess(&mut self, row: usize, col: usize) -> bool {
         if self.mask.get(row, col).unwrap_or(false) {
             let _ = self.hits.set(row, col);
             true

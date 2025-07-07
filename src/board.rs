@@ -97,39 +97,43 @@ impl BoardState {
         Ok(())
     }
 
-    /// Randomly place all ships without overlap.
-    pub fn place_random<R: Rng>(&mut self, rng: &mut R) -> Result<(), BoardError> {
-        for i in 0..NUM_SHIPS as usize {
-            let def = SHIPS[i];
-            let mut attempts = 0;
-            loop {
-                if attempts > 100 {
-                    return Err(BoardError::UnableToPlaceShip);
-                }
-                attempts += 1;
-                let orient = if rng.random() {
-                    Orientation::Horizontal
-                } else {
-                    Orientation::Vertical
-                };
-                let max_r = if orient == Orientation::Vertical {
-                    BOARD_SIZE as usize - def.length()
-                } else {
-                    BOARD_SIZE as usize - 1
-                };
-                let max_c = if orient == Orientation::Horizontal {
-                    BOARD_SIZE as usize - def.length()
-                } else {
-                    BOARD_SIZE as usize - 1
-                };
-                let r = rng.random_range(0..=max_r);
-                let c = rng.random_range(0..=max_c);
-                if self.place(i, r, c, orient).is_ok() {
-                    break;
-                }
+    /// Returns a random non‐overlapping (row, col, Orientation) for `ship_index`.
+    pub fn random_placement<R: Rng>(
+        &self,
+        rng: &mut R,
+        ship_index: usize,
+    ) -> Result<(usize, usize, Orientation), BoardError> {
+        if ship_index >= NUM_SHIPS as usize {
+            return Err(BoardError::InvalidIndex);
+        }
+        let def = SHIPS[ship_index];
+        let mut attempts = 0;
+        while attempts < 100 {
+            attempts += 1;
+            let orient = if rng.random() {
+                Orientation::Horizontal
+            } else {
+                Orientation::Vertical
+            };
+            let max_r = if orient == Orientation::Vertical {
+                BOARD_SIZE as usize - def.length()
+            } else {
+                BOARD_SIZE as usize - 1
+            };
+            let max_c = if orient == Orientation::Horizontal {
+                BOARD_SIZE as usize - def.length()
+            } else {
+                BOARD_SIZE as usize - 1
+            };
+            let r = rng.random_range(0..=max_r);
+            let c = rng.random_range(0..=max_c);
+            // build a temp ship and check overlap
+            let ship = Ship::<u128, { BOARD_SIZE as usize }>::new(def, orient, r, c)?;
+            if (self.ship_map & ship.mask()).is_empty() {
+                return Ok((r, c, orient));
             }
         }
-        Ok(())
+        Err(BoardError::UnableToPlaceShip)
     }
 
     /// Process a guess at (row, col), marking hits/misses and reporting result.
@@ -146,7 +150,7 @@ impl BoardState {
             for (i, slot) in self.ships.iter_mut().enumerate() {
                 if let Some(ps) = slot {
                     if ps.ship.mask().get(row, col).unwrap_or(false) {
-                        ps.ship.register_hit(row, col);
+                        ps.ship.guess(row, col);
                         if ps.ship.is_sunk() && !self.ship_states[i].sunk {
                             self.ship_states[i].sunk = true;
                             return Ok(GuessResult::Sink(ps.ship.ship_type().name()));
@@ -156,7 +160,7 @@ impl BoardState {
                 }
             }
             // should have found a ship; fallback
-            Ok(GuessResult::Hit)
+            Err(BoardError::UnknownShipHit)
         } else {
             self.misses.set(row, col)?;
             Ok(GuessResult::Miss)
