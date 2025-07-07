@@ -1,4 +1,4 @@
-use battleship::{AiPlayer, GameEngine, GameStatus, Player, NUM_SHIPS};
+use battleship::{AiPlayer, GameEngine, GameStatus, Player};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 

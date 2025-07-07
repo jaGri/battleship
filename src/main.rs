@@ -1,8 +1,8 @@
 use battleship::{AiPlayer, CliPlayer, GameEngine, GameStatus, Player, print_player_view};
-use rand::thread_rng;
+use rand::rng;
 
 fn main() {
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let mut cli = CliPlayer::new();
     let mut ai = AiPlayer::new();
     let mut my_engine = GameEngine::new();
