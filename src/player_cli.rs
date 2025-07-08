@@ -1,4 +1,5 @@
-extern crate std;
+#![cfg(feature = "std")]
+
 use std::io::{self, Write};
 use std::string::String;
 

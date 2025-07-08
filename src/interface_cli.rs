@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use std::fmt;
 
 use crate::board::{Board, BoardError, GuessResult};

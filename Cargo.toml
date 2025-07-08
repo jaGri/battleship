@@ -5,4 +5,9 @@ edition = "2021"
 
 [dependencies]
 num-traits = { version = "0.2", default-features = false }
-rand = "0.9.1"
+rand = { version = "0.9.1", default-features = false, features = ["alloc", "small_rng"] }
+anyhow = { version = "1", default-features = false }
+
+[features]
+default = ["std"]
+std = ["rand/thread_rng", "anyhow/std"]
