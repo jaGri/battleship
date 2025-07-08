@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use crate::protocol::GameApi;
 use std::io::{self, Write};
 

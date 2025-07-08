@@ -5,3 +5,6 @@ pub trait Transport: Send + Sync {
     async fn send(&mut self, msg: Message) -> anyhow::Result<()>;
     async fn recv(&mut self) -> anyhow::Result<Message>;
 }
+
+#[cfg(feature = "std")]
+pub mod tcp;
