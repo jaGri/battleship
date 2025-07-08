@@ -62,7 +62,12 @@ pub fn calc_pdf(
                     // used a base of 2 which diluted the impact when many
                     // other placements were possible. Using a larger bias
                     // concentrates the probability mass around known hits.
-                    const HIT_BIAS: f64 = 10.0;
+                    // Empirically a larger multiplier greatly improves target
+                    // selection around partial ship discoveries.
+                    // A base of 50 heavily favors placements that include
+                    // multiple confirmed hits while still allowing some
+                    // exploration elsewhere.
+                    const HIT_BIAS: f64 = 50.0;
                     let weight = if n_hits == 0 {
                         1.0
                     } else {
