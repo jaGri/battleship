@@ -56,11 +56,18 @@ pub fn calc_pdf(
                     }
                     if !valid { continue; }
 
-                    // simple likelihood: placements covering more observed hits
-                    // carry proportionally more weight. Heavily bias toward
-                    // coordinates adjacent to known hits so the suggested
-                    // guesses focus around partially discovered ships.
-                    let weight = 2f64.powi(n_hits as i32);
+                    // Placements covering more observed hits should receive
+                    // dramatically more weight so that squares adjacent to
+                    // confirmed hits stand out. The previous implementation
+                    // used a base of 2 which diluted the impact when many
+                    // other placements were possible. Using a larger bias
+                    // concentrates the probability mass around known hits.
+                    const HIT_BIAS: f64 = 10.0;
+                    let weight = if n_hits == 0 {
+                        1.0
+                    } else {
+                        HIT_BIAS.powi(n_hits as i32)
+                    };
                     for k in 0..len {
                         let rr = r + if matches!(orient, Orientation::Vertical) { k } else {0};
                         let cc = c + if matches!(orient, Orientation::Horizontal) { k } else {0};
