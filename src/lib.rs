@@ -5,6 +5,7 @@ extern crate std;
 mod ai;
 mod bitboard;
 mod board;
+pub mod domain;
 mod common;
 mod config;
 mod game;
@@ -12,7 +13,13 @@ mod player;
 mod player_ai;
 #[cfg(feature = "std")]
 mod player_cli;
+pub mod protocol;
+pub mod transport;
+#[cfg(feature = "std")]
+pub mod transport_tcp;
 mod ship;
+pub mod skeleton;
+pub mod stub;
 //mod interface_cli;
 
 pub use ai::*;
@@ -25,5 +32,8 @@ pub use player::*;
 pub use player_ai::*;
 #[cfg(feature = "std")]
 pub use player_cli::*;
+pub use protocol::*;
 pub use ship::*;
+pub use skeleton::*;
+pub use stub::*;
 //pub use interface_cli::*;

@@ -1,5 +1,14 @@
 use crate::{protocol::GameApi, protocol::Message, transport::Transport};
-pub struct Stub<T: Transport> { transport: T }
+use crate::domain::{GuessResult, Ship, SyncPayload, GameStatus};
+pub struct Stub<T: Transport> {
+    transport: T,
+}
+
+impl<T: Transport> Stub<T> {
+    pub fn new(transport: T) -> Self {
+        Self { transport }
+    }
+}
 #[async_trait::async_trait]
 impl<T: Transport> GameApi for Stub<T> {
     async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<GuessResult> {
