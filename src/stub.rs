@@ -1,4 +1,4 @@
-use crate::{engine_api::GameApi, protocol::Message, transport::Transport};
+use crate::{protocol::GameApi, protocol::Message, transport::Transport};
 pub struct Stub<T: Transport> { transport: T }
 #[async_trait::async_trait]
 impl<T: Transport> GameApi for Stub<T> {

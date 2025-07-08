@@ -1,4 +1,4 @@
-use crate::engine_api::GameApi;
+use crate::protocol::GameApi;
 use std::io::{self, Write};
 
 pub async fn run_cli(api: Box<dyn GameApi>) -> anyhow::Result<()> {

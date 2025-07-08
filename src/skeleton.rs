@@ -1,4 +1,4 @@
-use crate::{engine_api::GameApi, protocol::Message, transport::Transport};
+use crate::{protocol::GameApi, protocol::Message, transport::Transport};
 pub struct Skeleton<E: GameApi, T: Transport> { engine: E, transport: T }
 impl<E: GameApi, T: Transport> Skeleton<E, T> {
     pub async fn run(&mut self) -> anyhow::Result<()> {
