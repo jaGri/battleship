@@ -2,7 +2,11 @@
 
 use crate::bitboard::BitBoardError;
 
+#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
+
 /// Result of a guess attempt.
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GuessResult {
     /// Guess hit an undepleted ship segment.

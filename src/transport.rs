@@ -1,4 +1,5 @@
 use crate::protocol::Message;
+use alloc::boxed::Box;
 
 #[async_trait::async_trait]
 pub trait Transport: Send + Sync {
