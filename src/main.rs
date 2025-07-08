@@ -1,4 +1,13 @@
-use battleship::{AiPlayer, CliPlayer, GameEngine, GameStatus, Player, print_player_view};
+use battleship::{
+    AiPlayer,
+    CliPlayer,
+    GameEngine,
+    GameStatus,
+    Player,
+    print_player_view,
+    print_probability_board,
+    calc_pdf,
+};
 use rand::rng;
 
 fn main() {
@@ -16,6 +25,12 @@ fn main() {
     loop {
         // show current boards before taking a turn
         print_player_view(&my_engine);
+        let pdf = calc_pdf(
+            &my_engine.guess_hits(),
+            &my_engine.guess_misses(),
+            &my_engine.enemy_ship_lengths_remaining(),
+        );
+        print_probability_board(&pdf);
 
         // player turn
         let guess = cli.select_target(
