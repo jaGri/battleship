@@ -94,6 +94,24 @@ fn print_guess_board(hits: &BB, misses: &BB) {
     }
 }
 
+/// Print a normalized probability distribution matrix.
+pub fn print_probability_board(pdf: &[[f64; BOARD_SIZE as usize]; BOARD_SIZE as usize]) {
+    std::println!("\nProbability distribution:");
+    std::print!("   ");
+    for c in 0..BOARD_SIZE as usize {
+        let ch = (b'A' + c as u8) as char;
+        std::print!(" {:>4}", ch);
+    }
+    std::println!();
+    for r in 0..BOARD_SIZE as usize {
+        std::print!("{:2} ", r + 1);
+        for c in 0..BOARD_SIZE as usize {
+            std::print!(" {:4.2}", pdf[r][c]);
+        }
+        std::println!();
+    }
+}
+
 /// Display the opponent board (top) and the player's board (bottom).
 pub fn print_player_view(engine: &GameEngine) {
     std::println!("Opponent board:");
