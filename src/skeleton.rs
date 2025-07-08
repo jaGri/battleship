@@ -8,7 +8,7 @@ impl<E: GameApi, T: Transport> Skeleton<E, T> {
                     let res = self.engine.make_guess(x, y).await?;
                     Message::StatusResp(res)
                 }
-                Message::StatusReq => Message::StatusResp(self.engine.status()),
+                Message::StatusReq => Message::Ack,
                 Message::Sync(payload) => { self.engine.sync_state(payload).await?; Message::Ack },
                 _ => Message::Ack,
             };
