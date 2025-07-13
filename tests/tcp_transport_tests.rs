@@ -12,7 +12,7 @@ impl GameApi for DummyEngine {
         Ok(GuessResult::Hit)
     }
     async fn get_ship_status(&self, _ship_id: usize) -> anyhow::Result<Ship> {
-        Ok(Ship {})
+        Ok(Ship { name: "dummy", sunk: false, position: None })
     }
     async fn sync_state(&mut self, _payload: SyncPayload) -> anyhow::Result<()> {
         Ok(())

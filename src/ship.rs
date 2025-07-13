@@ -8,6 +8,7 @@ use crate::common::BoardError;
 
 /// Orientation of a ship on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum Orientation {
     Horizontal,
     Vertical,

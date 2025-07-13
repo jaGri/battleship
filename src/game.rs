@@ -144,7 +144,7 @@ impl GameEngine {
     /// Lengths of enemy ships that have not yet been sunk. Entries are zero
     /// for ships already sunk, maintaining fixed-size output for `no_std`
     /// callers.
-    pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
+pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
         let mut lens = [0usize; NUM_SHIPS as usize];
         for (i, def) in SHIPS.iter().enumerate() {
             if self.enemy_ships_remaining[i] {
@@ -152,5 +152,37 @@ impl GameEngine {
             }
         }
         lens
+    }
+}
+
+#[cfg_attr(feature = "std", async_trait::async_trait)]
+impl crate::protocol::GameApi for GameEngine {
+    async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<crate::domain::GuessResult> {
+        let res = self
+            .opponent_guess(x as usize, y as usize)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        Ok(crate::domain::GuessResult::from(res))
+    }
+
+    async fn get_ship_status(&self, ship_id: usize) -> anyhow::Result<crate::domain::Ship> {
+        let states = self.board.ship_states();
+        if ship_id >= states.len() {
+            return Err(anyhow::anyhow!(BoardError::InvalidIndex));
+        }
+        Ok(crate::domain::Ship::from(states[ship_id]))
+    }
+
+    async fn sync_state(&mut self, _payload: crate::domain::SyncPayload) -> anyhow::Result<()> {
+        // Protocol payload is placeholder; simply sync using current state helpers
+        // when payloads carry real state in the future.
+        Ok(())
+    }
+
+    fn status(&self) -> crate::domain::GameStatus {
+        match GameEngine::status(self) {
+            GameStatus::InProgress => crate::domain::GameStatus::InProgress,
+            GameStatus::Won => crate::domain::GameStatus::Won,
+            GameStatus::Lost => crate::domain::GameStatus::Lost,
+        }
     }
 }
