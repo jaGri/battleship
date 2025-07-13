@@ -1,7 +1,11 @@
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Board { /* grid, ships, hits/misses */ }
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-pub struct Ship { /* length, coords, orientation */ }
+pub struct Ship {
+    pub name: &'static str,
+    pub sunk: bool,
+    pub position: Option<(u8, u8, crate::ship::Orientation)>,
+}
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -22,3 +26,23 @@ pub enum GameStatus {
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct SyncPayload; /* serialized state diff */
+
+impl From<crate::common::GuessResult> for GuessResult {
+    fn from(res: crate::common::GuessResult) -> Self {
+        match res {
+            crate::common::GuessResult::Hit => GuessResult::Hit,
+            crate::common::GuessResult::Miss => GuessResult::Miss,
+            crate::common::GuessResult::Sink(_) => GuessResult::Sink,
+        }
+    }
+}
+
+impl From<crate::ship::ShipState> for Ship {
+    fn from(state: crate::ship::ShipState) -> Self {
+        Ship {
+            name: state.name,
+            sunk: state.sunk,
+            position: state.position.map(|(r, c, o)| (r as u8, c as u8, o)),
+        }
+    }
+}
