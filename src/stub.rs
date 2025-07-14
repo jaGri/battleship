@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use crate::{protocol::GameApi, protocol::Message, transport::Transport};
 use crate::domain::{GuessResult, Ship, SyncPayload, GameStatus};
 use tokio::sync::Mutex;

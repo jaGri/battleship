@@ -1,26 +1,30 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 mod ai;
 mod bitboard;
 mod board;
-pub mod domain;
 mod common;
 mod config;
+pub mod domain;
 mod game;
 mod player;
 mod player_ai;
 #[cfg(feature = "std")]
 mod player_cli;
-pub mod protocol;
-pub mod transport;
 #[cfg(feature = "std")]
-pub mod transport_tcp;
+pub mod player_node;
+pub mod protocol;
 mod ship;
 pub mod skeleton;
 pub mod stub;
-pub mod player_node;
+#[cfg(feature = "std")]
+pub mod transport;
+#[cfg(feature = "std")]
+pub mod transport_tcp;
 //mod interface_cli;
 
 pub use ai::*;
@@ -33,9 +37,12 @@ pub use player::*;
 pub use player_ai::*;
 #[cfg(feature = "std")]
 pub use player_cli::*;
+#[cfg(feature = "std")]
+pub use player_node::*;
 pub use protocol::*;
 pub use ship::*;
+#[cfg(feature = "std")]
 pub use skeleton::*;
+#[cfg(feature = "std")]
 pub use stub::*;
-pub use player_node::*;
 //pub use interface_cli::*;

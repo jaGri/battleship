@@ -1,3 +1,8 @@
+#[cfg(not(feature = "std"))]
+use alloc::string::{String, ToString};
+#[cfg(feature = "std")]
+use std::string::{String, ToString};
+
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Board { /* grid, ships, hits/misses */ }
 #[derive(Debug, Clone)]

@@ -6,6 +6,8 @@ use crate::{
     config::{BOARD_SIZE, NUM_SHIPS},
     ship::Orientation,
 };
+use libm::pow;
+use num_traits::float::FloatCore;
 use rand::Rng;
 
 /// Bitboard type alias for convenience.
@@ -25,7 +27,9 @@ pub fn calc_pdf(
     let mut matrix = [[0.0f64; GRID_SIZE]; GRID_SIZE];
 
     for &len in remaining_lengths.iter() {
-        if len == 0 { continue; }
+        if len == 0 {
+            continue;
+        }
 
         for orient in [Orientation::Horizontal, Orientation::Vertical] {
             let max_row = if matches!(orient, Orientation::Vertical) {
@@ -44,8 +48,16 @@ pub fn calc_pdf(
                     let mut valid = true;
                     let mut n_hits = 0usize;
                     for k in 0..len {
-                        let rr = r + if matches!(orient, Orientation::Vertical) { k } else {0};
-                        let cc = c + if matches!(orient, Orientation::Horizontal) { k } else {0};
+                        let rr = r + if matches!(orient, Orientation::Vertical) {
+                            k
+                        } else {
+                            0
+                        };
+                        let cc = c + if matches!(orient, Orientation::Horizontal) {
+                            k
+                        } else {
+                            0
+                        };
                         if misses.get(rr, cc).unwrap_or(false) {
                             valid = false;
                             break;
@@ -54,7 +66,9 @@ pub fn calc_pdf(
                             n_hits += 1;
                         }
                     }
-                    if !valid { continue; }
+                    if !valid {
+                        continue;
+                    }
 
                     // Placements covering more observed hits should receive
                     // dramatically more weight so that squares adjacent to
@@ -74,9 +88,19 @@ pub fn calc_pdf(
                         HIT_BIAS.powi(n_hits as i32)
                     };
                     for k in 0..len {
-                        let rr = r + if matches!(orient, Orientation::Vertical) { k } else {0};
-                        let cc = c + if matches!(orient, Orientation::Horizontal) { k } else {0};
-                        if !hits.get(rr, cc).unwrap_or(false) && !misses.get(rr, cc).unwrap_or(false) {
+                        let rr = r + if matches!(orient, Orientation::Vertical) {
+                            k
+                        } else {
+                            0
+                        };
+                        let cc = c + if matches!(orient, Orientation::Horizontal) {
+                            k
+                        } else {
+                            0
+                        };
+                        if !hits.get(rr, cc).unwrap_or(false)
+                            && !misses.get(rr, cc).unwrap_or(false)
+                        {
                             matrix[rr][cc] += weight;
                         }
                     }
@@ -122,7 +146,7 @@ pub fn sample_pdf<R: Rng + ?Sized>(
     let mut total = 0.0;
     for r in 0..GRID_SIZE {
         for c in 0..GRID_SIZE {
-            let v = pdf[r][c].powf(1.0 / temperature);
+            let v = pow(pdf[r][c], 1.0 / temperature);
             adjusted[r][c] = v;
             total += v;
         }
@@ -159,4 +183,3 @@ pub fn calc_pdf_and_guess<R: Rng + ?Sized>(
     // so suggestions hone in on likely ship locations.
     sample_pdf(&pdf, 0.5, rng)
 }
-
