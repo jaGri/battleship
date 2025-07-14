@@ -76,5 +76,15 @@ impl PlayerNode {
         }
         Ok(())
     }
+
+    /// Current status of the underlying game engine.
+    pub fn status(&self) -> GameStatus {
+        self.engine.status()
+    }
+
+    /// Total number of guesses this player has made.
+    pub fn guess_count(&self) -> usize {
+        self.engine.guess_hits().count_ones() + self.engine.guess_misses().count_ones()
+    }
 }
 
