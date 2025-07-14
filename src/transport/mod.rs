@@ -8,3 +8,5 @@ pub trait Transport: Send + Sync {
 
 #[cfg(feature = "std")]
 pub mod tcp;
+#[cfg(feature = "std")]
+pub mod in_memory;
