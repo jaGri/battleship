@@ -12,7 +12,7 @@ impl GameApi for DummyEngine {
         Ok(GuessResult::Hit)
     }
     async fn get_ship_status(&self, _ship_id: usize) -> anyhow::Result<Ship> {
-        Ok(Ship { name: "dummy", sunk: false, position: None })
+        Ok(Ship { name: "dummy".to_string(), sunk: false, position: None })
     }
     async fn sync_state(&mut self, _payload: SyncPayload) -> anyhow::Result<()> {
         Ok(())
@@ -22,7 +22,7 @@ impl GameApi for DummyEngine {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_stub_skeleton_tcp() -> anyhow::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
@@ -40,6 +40,14 @@ async fn test_stub_skeleton_tcp() -> anyhow::Result<()> {
 
     let res = stub.make_guess(1, 2).await?;
     assert!(matches!(res, GuessResult::Hit));
+
+    let ship = stub.get_ship_status(0).await?;
+    assert_eq!(ship.name, "dummy");
+
+    stub.sync_state(SyncPayload).await?;
+
+    let status = stub.status();
+    assert!(matches!(status, GameStatus::InProgress));
 
     drop(stub);
     server.await.unwrap();
