@@ -1,4 +1,4 @@
-use battleship::transport_tcp::TcpTransport;
+use battleship::transport::tcp::TcpTransport;
 use battleship::protocol::GameApi;
 use battleship::domain::{GuessResult, GameStatus, Ship, SyncPayload};
 use battleship::{Skeleton, Stub};

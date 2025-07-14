@@ -1,7 +1,6 @@
-use battleship::protocol::Message;
 use battleship::transport::in_memory::InMemoryTransport;
 use battleship::transport::Transport;
-use battleship::transport_tcp::TcpTransport;
+use battleship::transport::tcp::TcpTransport;
 use battleship::{AiPlayer, GameEngine, GameStatus, Player, PlayerNode};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -31,8 +30,6 @@ async fn run_game(kind: TransportKind) -> anyhow::Result<()> {
         }
     };
 
-    // Send an initial guess so one node can start processing immediately
-    t2.send(Message::Guess { x: 0, y: 0 }).await?;
 
     let mut rng1 = SmallRng::seed_from_u64(1);
     let mut rng2 = SmallRng::seed_from_u64(2);
@@ -50,10 +47,10 @@ async fn run_game(kind: TransportKind) -> anyhow::Result<()> {
 
     tokio::join!(
         async {
-            node1.run(&mut rng1).await.unwrap();
+            node1.run(&mut rng1, true).await.unwrap();
         },
         async {
-            node2.run(&mut rng2).await.unwrap();
+            node2.run(&mut rng2, false).await.unwrap();
         },
     );
 

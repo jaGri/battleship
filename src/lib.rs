@@ -23,8 +23,6 @@ pub mod skeleton;
 pub mod stub;
 #[cfg(feature = "std")]
 pub mod transport;
-#[cfg(feature = "std")]
-pub mod transport_tcp;
 //mod interface_cli;
 
 pub use ai::*;
@@ -45,4 +43,6 @@ pub use ship::*;
 pub use skeleton::*;
 #[cfg(feature = "std")]
 pub use stub::*;
+#[cfg(feature = "std")]
+pub use transport::tcp::TcpTransport;
 //pub use interface_cli::*;
