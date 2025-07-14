@@ -5,19 +5,19 @@ use crate::{
     config::{BOARD_SIZE, NUM_SHIPS},
     BoardError,
 };
-use rand::Rng;
+use rand::rngs::SmallRng;
 
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 /// Interface implemented by different player types.
 pub trait Player {
     /// Place all ships onto the provided board.
-    fn place_ships<R: Rng>(&mut self, rng: &mut R, board: &mut Board) -> Result<(), BoardError>;
+    fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError>;
 
     /// Choose the next target coordinate given guess history and remaining enemy ships.
-    fn select_target<R: Rng>(
+    fn select_target(
         &mut self,
-        rng: &mut R,
+        rng: &mut SmallRng,
         hits: &BB,
         misses: &BB,
         remaining: &[usize; NUM_SHIPS as usize],

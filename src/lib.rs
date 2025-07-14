@@ -20,6 +20,7 @@ pub mod transport_tcp;
 mod ship;
 pub mod skeleton;
 pub mod stub;
+pub mod player_node;
 //mod interface_cli;
 
 pub use ai::*;
@@ -36,4 +37,5 @@ pub use protocol::*;
 pub use ship::*;
 pub use skeleton::*;
 pub use stub::*;
+pub use player_node::*;
 //pub use interface_cli::*;

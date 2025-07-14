@@ -8,10 +8,12 @@ use battleship::{
     print_probability_board,
     calc_pdf,
 };
-use rand::rng;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 
 fn main() {
-    let mut rng = rng();
+    let mut seed = rand::rng();
+    let mut rng = SmallRng::from_rng(&mut seed);
     let mut cli = CliPlayer::new();
     let mut ai = AiPlayer::new();
     let mut my_engine = GameEngine::new();

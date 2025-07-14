@@ -12,7 +12,7 @@ use crate::{
     GameEngine,
     BoardError,
 };
-use rand::Rng;
+use rand::rngs::SmallRng;
 
 use crate::player::Player;
 
@@ -121,7 +121,7 @@ pub fn print_player_view(engine: &GameEngine) {
 }
 
 impl Player for CliPlayer {
-    fn place_ships<R: Rng>(&mut self, rng: &mut R, board: &mut Board) -> Result<(), BoardError> {
+    fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError> {
         std::println!("Place your ships (e.g. A5 H). Enter 'r' for random placement.");
         for i in 0..NUM_SHIPS as usize {
             let def = SHIPS[i];
@@ -158,9 +158,9 @@ impl Player for CliPlayer {
         Ok(())
     }
 
-    fn select_target<R: Rng>(
+    fn select_target(
         &mut self,
-        rng: &mut R,
+        rng: &mut SmallRng,
         hits: &BB,
         misses: &BB,
         remaining: &[usize; NUM_SHIPS as usize],
