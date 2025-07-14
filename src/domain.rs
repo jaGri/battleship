@@ -1,8 +1,9 @@
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Board { /* grid, ships, hits/misses */ }
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ship {
-    pub name: &'static str,
+    pub name: String,
     pub sunk: bool,
     pub position: Option<(u8, u8, crate::ship::Orientation)>,
 }
@@ -40,7 +41,7 @@ impl From<crate::common::GuessResult> for GuessResult {
 impl From<crate::ship::ShipState> for Ship {
     fn from(state: crate::ship::ShipState) -> Self {
         Ship {
-            name: state.name,
+            name: state.name.to_string(),
             sunk: state.sunk,
             position: state.position.map(|(r, c, o)| (r as u8, c as u8, o)),
         }

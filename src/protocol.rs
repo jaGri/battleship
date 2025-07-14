@@ -15,6 +15,14 @@ pub enum Message {
     StatusResp(GuessResult),
     /// Synchronise state between peers.
     Sync(SyncPayload),
+    /// Request the status of a particular ship by id.
+    ShipStatusReq { id: usize },
+    /// Response containing the status of a ship.
+    ShipStatusResp(Ship),
+    /// Request the overall game status.
+    GameStatusReq,
+    /// Response containing the current game status.
+    GameStatusResp(GameStatus),
     /// Generic acknowledgement.
     Ack,
 }
