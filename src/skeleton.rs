@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use crate::{protocol::GameApi, protocol::Message, transport::Transport};
 
 pub struct Skeleton<E: GameApi, T: Transport> {

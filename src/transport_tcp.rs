@@ -1,6 +1,6 @@
-#[cfg(feature = "std")]
+#![cfg(feature = "std")]
+
 use tokio::net::{TcpStream, ToSocketAddrs};
-#[cfg(feature = "std")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::transport::Transport;

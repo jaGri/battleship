@@ -1,3 +1,4 @@
+#[cfg(feature = "std")]
 use battleship::{
     AiPlayer,
     CliPlayer,
@@ -8,8 +9,15 @@ use battleship::{
     print_probability_board,
     calc_pdf,
 };
+#[cfg(feature = "std")]
 use rand::rngs::SmallRng;
+#[cfg(feature = "std")]
 use rand::SeedableRng;
+
+#[cfg(not(feature = "std"))]
+fn main() {}
+
+#[cfg(feature = "std")]
 
 fn main() {
     let mut seed = rand::rng();

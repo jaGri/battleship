@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use crate::protocol::Message;
 
 #[async_trait::async_trait]
