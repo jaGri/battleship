@@ -6,7 +6,7 @@ use crate::{
     config::{BOARD_SIZE, NUM_SHIPS},
     BoardError,
 };
-use rand::Rng;
+use rand::rngs::SmallRng;
 
 use crate::player::Player;
 
@@ -22,7 +22,7 @@ impl AiPlayer {
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 impl Player for AiPlayer {
-    fn place_ships<R: Rng>(&mut self, rng: &mut R, board: &mut Board) -> Result<(), BoardError> {
+    fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError> {
         for i in 0..NUM_SHIPS as usize {
             let (r, c, o) = board.random_placement(rng, i)?;
             board.place(i, r, c, o)?;
@@ -30,9 +30,9 @@ impl Player for AiPlayer {
         Ok(())
     }
 
-    fn select_target<R: Rng>(
+    fn select_target(
         &mut self,
-        rng: &mut R,
+        rng: &mut SmallRng,
         hits: &BB,
         misses: &BB,
         remaining: &[usize; NUM_SHIPS as usize],
