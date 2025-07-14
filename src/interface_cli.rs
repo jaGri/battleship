@@ -1,6 +1,8 @@
 #![cfg(feature = "std")]
 
-use std::fmt;
+//! Experimental CLI helpers for displaying boards.
+//! This module is not fully integrated and may be removed.
+//! It is compiled only when the `std` feature is enabled.
 
 use crate::board::{Board, BoardError, GuessResult};
  

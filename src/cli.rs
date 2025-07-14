@@ -1,5 +1,9 @@
 #![cfg(feature = "std")]
 
+//! Experimental text-based client interface.
+//! This module is incomplete and may change without notice.
+//! It is only compiled when the `std` feature is enabled.
+
 use crate::protocol::GameApi;
 use std::io::{self, Write};
 
