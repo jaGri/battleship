@@ -24,53 +24,54 @@ impl PlayerNode {
         Self { player, engine, transport }
     }
 
-    pub async fn run(&mut self, rng: &mut SmallRng) -> anyhow::Result<()> {
+    pub async fn run(&mut self, rng: &mut SmallRng, first_move: bool) -> anyhow::Result<()> {
+        let mut my_turn = first_move;
         loop {
-            // Receive opponent guess and respond
-            let msg = self.transport.recv().await?;
-            if let Message::Guess { x, y } = msg {
-                let res_common = self
-                    .engine
-                    .opponent_guess(x as usize, y as usize)
-                    .map_err(|e| anyhow::anyhow!(e))?;
-                self.player
-                    .handle_opponent_guess((x as usize, y as usize), res_common);
-                let res_domain = DomainGuessResult::from(res_common);
+            if my_turn {
+                // Choose our guess and send to opponent
+                let (r, c) = self.player.select_target(
+                    rng,
+                    &self.engine.guess_hits(),
+                    &self.engine.guess_misses(),
+                    &self.engine.enemy_ship_lengths_remaining(),
+                );
                 self.transport
-                    .send(Message::StatusResp(res_domain))
+                    .send(Message::Guess { x: r as u8, y: c as u8 })
                     .await?;
+                let reply = self.transport.recv().await?;
+                let res_domain = match reply {
+                    Message::StatusResp(res) => res,
+                    _ => return Err(anyhow::anyhow!("unexpected reply")),
+                };
+                let res_common = match res_domain {
+                    DomainGuessResult::Hit => GuessResult::Hit,
+                    DomainGuessResult::Miss => GuessResult::Miss,
+                    DomainGuessResult::Sink => GuessResult::Hit,
+                };
+                self.engine
+                    .record_guess(r, c, res_common)
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                self.player.handle_guess_result((r, c), res_common);
+                my_turn = false;
             } else {
-                continue;
+                // Receive opponent guess and respond
+                let msg = self.transport.recv().await?;
+                if let Message::Guess { x, y } = msg {
+                    let res_common = self
+                        .engine
+                        .opponent_guess(x as usize, y as usize)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    self.player
+                        .handle_opponent_guess((x as usize, y as usize), res_common);
+                    let res_domain = DomainGuessResult::from(res_common);
+                    self.transport
+                        .send(Message::StatusResp(res_domain))
+                        .await?;
+                } else {
+                    continue;
+                }
+                my_turn = true;
             }
-
-            if matches!(self.engine.status(), GameStatus::Lost) {
-                break;
-            }
-
-            // Choose our guess and send to opponent
-            let (r, c) = self.player.select_target(
-                rng,
-                &self.engine.guess_hits(),
-                &self.engine.guess_misses(),
-                &self.engine.enemy_ship_lengths_remaining(),
-            );
-            self.transport
-                .send(Message::Guess { x: r as u8, y: c as u8 })
-                .await?;
-            let reply = self.transport.recv().await?;
-            let res_domain = match reply {
-                Message::StatusResp(res) => res,
-                _ => return Err(anyhow::anyhow!("unexpected reply")),
-            };
-            let res_common = match res_domain {
-                DomainGuessResult::Hit => GuessResult::Hit,
-                DomainGuessResult::Miss => GuessResult::Miss,
-                DomainGuessResult::Sink => GuessResult::Hit,
-            };
-            self.engine
-                .record_guess(r, c, res_common)
-                .map_err(|e| anyhow::anyhow!(e))?;
-            self.player.handle_guess_result((r, c), res_common);
 
             if !matches!(self.engine.status(), GameStatus::InProgress) {
                 break;
