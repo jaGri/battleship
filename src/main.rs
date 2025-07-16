@@ -1,81 +1,123 @@
+#[cfg(not(feature = "std"))]
+fn main() {}
+
 #[cfg(feature = "std")]
 use battleship::{
+    transport::in_memory::InMemoryTransport,
     AiPlayer,
     CliPlayer,
     GameEngine,
     GameStatus,
     Player,
+    PlayerNode,
     print_player_view,
     print_probability_board,
     calc_pdf,
 };
+
 #[cfg(feature = "std")]
 use rand::rngs::SmallRng;
 #[cfg(feature = "std")]
 use rand::SeedableRng;
 
-#[cfg(not(feature = "std"))]
-fn main() {}
-
 #[cfg(feature = "std")]
-
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let mut seed = rand::rng();
-    let mut rng = SmallRng::from_rng(&mut seed);
+    let mut rng_cli = SmallRng::from_rng(&mut seed);
+    let mut rng_ai = SmallRng::from_rng(&mut seed);
+
     let mut cli = CliPlayer::new();
     let mut ai = AiPlayer::new();
-    let mut my_engine = GameEngine::new();
+    let mut cli_engine = GameEngine::new();
     let mut ai_engine = GameEngine::new();
 
-    cli.place_ships(&mut rng, my_engine.board_mut())
-        .expect("placement");
-    ai.place_ships(&mut rng, ai_engine.board_mut())
-        .expect("placement");
+    cli
+        .place_ships(&mut rng_cli, cli_engine.board_mut())
+        .map_err(|e| anyhow::anyhow!(e))?;
+    ai
+        .place_ships(&mut rng_ai, ai_engine.board_mut())
+        .map_err(|e| anyhow::anyhow!(e))?;
 
+    let (t_cli, t_ai) = InMemoryTransport::pair();
+
+    let ai_future = async move {
+        let mut node = PlayerNode::new(Box::new(ai), ai_engine, Box::new(t_ai));
+        node.run(&mut rng_ai, false).await
+    };
+
+    let cli_future = run_cli(cli, cli_engine, Box::new(t_cli), rng_cli);
+
+    tokio::try_join!(cli_future, ai_future)?;
+    Ok(())
+}
+
+#[cfg(feature = "std")]
+async fn run_cli(
+    mut player: CliPlayer,
+    mut engine: GameEngine,
+    mut transport: Box<dyn battleship::transport::Transport>,
+    mut rng: SmallRng,
+) -> anyhow::Result<()> {
+    let mut my_turn = true;
     loop {
-        // show current boards before taking a turn
-        print_player_view(&my_engine);
-        let pdf = calc_pdf(
-            &my_engine.guess_hits(),
-            &my_engine.guess_misses(),
-            &my_engine.enemy_ship_lengths_remaining(),
-        );
-        print_probability_board(&pdf);
+        if my_turn {
+            print_player_view(&engine);
+            let pdf = calc_pdf(
+                &engine.guess_hits(),
+                &engine.guess_misses(),
+                &engine.enemy_ship_lengths_remaining(),
+            );
+            print_probability_board(&pdf);
 
-        // player turn
-        let guess = cli.select_target(
-            &mut rng,
-            &my_engine.guess_hits(),
-            &my_engine.guess_misses(),
-            &my_engine.enemy_ship_lengths_remaining(),
-        );
-        let res = ai_engine.opponent_guess(guess.0, guess.1).expect("guess");
-        my_engine
-            .record_guess(guess.0, guess.1, res)
-            .expect("record");
-        cli.handle_guess_result(guess, res);
-        print_player_view(&my_engine);
-        if ai_engine.status() == GameStatus::Lost {
-            println!("You won!");
-            break;
+            let (r, c) = player.select_target(
+                &mut rng,
+                &engine.guess_hits(),
+                &engine.guess_misses(),
+                &engine.enemy_ship_lengths_remaining(),
+            );
+            transport
+                .send(battleship::Message::Guess { x: r as u8, y: c as u8 })
+                .await?;
+            let reply = transport.recv().await?;
+            let res_domain = match reply {
+                battleship::Message::StatusResp(res) => res,
+                _ => return Err(anyhow::anyhow!("unexpected reply")),
+            };
+            let res_common = match res_domain {
+                battleship::domain::GuessResult::Hit => battleship::GuessResult::Hit,
+                battleship::domain::GuessResult::Miss => battleship::GuessResult::Miss,
+                battleship::domain::GuessResult::Sink => battleship::GuessResult::Hit,
+            };
+            engine.record_guess(r, c, res_common).map_err(|e| anyhow::anyhow!(e))?;
+            player.handle_guess_result((r, c), res_common);
+            my_turn = false;
+        } else {
+            let msg = transport.recv().await?;
+            if let battleship::Message::Guess { x, y } = msg {
+                let res_common = engine
+                    .opponent_guess(x as usize, y as usize)
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                player.handle_opponent_guess((x as usize, y as usize), res_common);
+                let res_domain = battleship::domain::GuessResult::from(res_common);
+                transport
+                    .send(battleship::Message::StatusResp(res_domain))
+                    .await?;
+            } else {
+                continue;
+            }
+            my_turn = true;
         }
 
-        // ai turn
-        let guess = ai.select_target(
-            &mut rng,
-            &ai_engine.guess_hits(),
-            &ai_engine.guess_misses(),
-            &ai_engine.enemy_ship_lengths_remaining(),
-        );
-        let res = my_engine.opponent_guess(guess.0, guess.1).expect("guess");
-        ai_engine
-            .record_guess(guess.0, guess.1, res)
-            .expect("record");
-        cli.handle_opponent_guess(guess, res);
-        print_player_view(&my_engine);
-        if my_engine.status() == GameStatus::Lost {
-            println!("You lost!");
+        if !matches!(engine.status(), GameStatus::InProgress) {
             break;
         }
     }
+    print_player_view(&engine);
+    match engine.status() {
+        GameStatus::Won => println!("You won!"),
+        GameStatus::Lost => println!("You lost!"),
+        _ => {}
+    }
+    Ok(())
 }

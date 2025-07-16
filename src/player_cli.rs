@@ -122,7 +122,7 @@ pub fn print_player_view(engine: &GameEngine) {
 
 impl Player for CliPlayer {
     fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError> {
-        std::println!("Place your ships (e.g. A5 H). Enter 'r' for random placement.");
+        std::println!("Place your ships (e.g. A5 H). Press enter for random placement.");
         for i in 0..NUM_SHIPS as usize {
             let def = SHIPS[i];
             loop {
@@ -132,7 +132,7 @@ impl Player for CliPlayer {
                 let mut line = String::new();
                 io::stdin().read_line(&mut line).unwrap();
                 let line = line.trim();
-                if line.eq_ignore_ascii_case("r") {
+                if line.is_empty() {
                     let (r, c, o) = board.random_placement(rng, i)?;
                     board.place(i, r, c, o)?;
                     break;
