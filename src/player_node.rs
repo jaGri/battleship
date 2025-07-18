@@ -6,11 +6,8 @@ use alloc::boxed::Box;
 use rand::rngs::SmallRng;
 
 use crate::{
-    domain::GuessResult as DomainGuessResult,
-    game::GameStatus,
-    player::Player,
-    transport::Transport,
-    GameEngine, protocol::Message, common::GuessResult,
+    common::GuessResult, config::ship_name_static, domain::GuessResult as DomainGuessResult,
+    game::GameStatus, player::Player, protocol::Message, transport::Transport, GameEngine,
 };
 
 pub struct PlayerNode {
@@ -21,7 +18,11 @@ pub struct PlayerNode {
 
 impl PlayerNode {
     pub fn new(player: Box<dyn Player>, engine: GameEngine, transport: Box<dyn Transport>) -> Self {
-        Self { player, engine, transport }
+        Self {
+            player,
+            engine,
+            transport,
+        }
     }
 
     pub async fn run(&mut self, rng: &mut SmallRng, first_move: bool) -> anyhow::Result<()> {
@@ -36,7 +37,10 @@ impl PlayerNode {
                     &self.engine.enemy_ship_lengths_remaining(),
                 );
                 self.transport
-                    .send(Message::Guess { x: r as u8, y: c as u8 })
+                    .send(Message::Guess {
+                        x: r as u8,
+                        y: c as u8,
+                    })
                     .await?;
                 let reply = self.transport.recv().await?;
                 let res_domain = match reply {
@@ -46,7 +50,11 @@ impl PlayerNode {
                 let res_common = match res_domain {
                     DomainGuessResult::Hit => GuessResult::Hit,
                     DomainGuessResult::Miss => GuessResult::Miss,
-                    DomainGuessResult::Sink => GuessResult::Hit,
+                    DomainGuessResult::Sink(name) => {
+                        let static_name = ship_name_static(&name)
+                            .ok_or_else(|| anyhow::anyhow!("unknown ship"))?;
+                        GuessResult::Sink(static_name)
+                    }
                 };
                 self.engine
                     .record_guess(r, c, res_common)
@@ -64,9 +72,7 @@ impl PlayerNode {
                     self.player
                         .handle_opponent_guess((x as usize, y as usize), res_common);
                     let res_domain = DomainGuessResult::from(res_common);
-                    self.transport
-                        .send(Message::StatusResp(res_domain))
-                        .await?;
+                    self.transport.send(Message::StatusResp(res_domain)).await?;
                 } else {
                     continue;
                 }
@@ -90,4 +96,3 @@ impl PlayerNode {
         self.engine.guess_hits().count_ones() + self.engine.guess_misses().count_ones()
     }
 }
-
