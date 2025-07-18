@@ -3,16 +3,9 @@ fn main() {}
 
 #[cfg(feature = "std")]
 use battleship::{
-    transport::in_memory::InMemoryTransport,
-    AiPlayer,
-    CliPlayer,
-    GameEngine,
-    GameStatus,
-    Player,
+    calc_pdf, print_player_view, print_probability_board, ship_name_static,
+    transport::in_memory::InMemoryTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player,
     PlayerNode,
-    print_player_view,
-    print_probability_board,
-    calc_pdf,
 };
 
 #[cfg(feature = "std")]
@@ -32,11 +25,9 @@ async fn main() -> anyhow::Result<()> {
     let mut cli_engine = GameEngine::new();
     let mut ai_engine = GameEngine::new();
 
-    cli
-        .place_ships(&mut rng_cli, cli_engine.board_mut())
+    cli.place_ships(&mut rng_cli, cli_engine.board_mut())
         .map_err(|e| anyhow::anyhow!(e))?;
-    ai
-        .place_ships(&mut rng_ai, ai_engine.board_mut())
+    ai.place_ships(&mut rng_ai, ai_engine.board_mut())
         .map_err(|e| anyhow::anyhow!(e))?;
 
     let (t_cli, t_ai) = InMemoryTransport::pair();
@@ -77,7 +68,10 @@ async fn run_cli(
                 &engine.enemy_ship_lengths_remaining(),
             );
             transport
-                .send(battleship::Message::Guess { x: r as u8, y: c as u8 })
+                .send(battleship::Message::Guess {
+                    x: r as u8,
+                    y: c as u8,
+                })
                 .await?;
             let reply = transport.recv().await?;
             let res_domain = match reply {
@@ -87,9 +81,15 @@ async fn run_cli(
             let res_common = match res_domain {
                 battleship::domain::GuessResult::Hit => battleship::GuessResult::Hit,
                 battleship::domain::GuessResult::Miss => battleship::GuessResult::Miss,
-                battleship::domain::GuessResult::Sink => battleship::GuessResult::Hit,
+                battleship::domain::GuessResult::Sink(name) => {
+                    let static_name =
+                        ship_name_static(&name).ok_or_else(|| anyhow::anyhow!("unknown ship"))?;
+                    battleship::GuessResult::Sink(static_name)
+                }
             };
-            engine.record_guess(r, c, res_common).map_err(|e| anyhow::anyhow!(e))?;
+            engine
+                .record_guess(r, c, res_common)
+                .map_err(|e| anyhow::anyhow!(e))?;
             player.handle_guess_result((r, c), res_common);
             my_turn = false;
         } else {

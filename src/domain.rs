@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use std::string::{String, ToString};
 
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-pub struct Board { /* grid, ships, hits/misses */ }
+pub struct Board {/* grid, ships, hits/misses */}
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ship {
@@ -18,7 +18,7 @@ pub struct Ship {
 pub enum GuessResult {
     Hit,
     Miss,
-    Sink,
+    Sink(String),
 }
 
 #[derive(Debug, Clone)]
@@ -38,7 +38,7 @@ impl From<crate::common::GuessResult> for GuessResult {
         match res {
             crate::common::GuessResult::Hit => GuessResult::Hit,
             crate::common::GuessResult::Miss => GuessResult::Miss,
-            crate::common::GuessResult::Sink(_) => GuessResult::Sink,
+            crate::common::GuessResult::Sink(name) => GuessResult::Sink(name.to_string()),
         }
     }
 }
