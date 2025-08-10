@@ -2,11 +2,7 @@
 fn main() {}
 
 #[cfg(feature = "std")]
-use battleship::{
-    calc_pdf, print_player_view, print_probability_board, ship_name_static,
-    transport::in_memory::InMemoryTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player,
-    PlayerNode,
-};
+use battleship::prelude::*;
 
 #[cfg(feature = "std")]
 use rand::rngs::SmallRng;
