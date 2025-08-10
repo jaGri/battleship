@@ -1,6 +1,6 @@
 use battleship::transport::tcp::TcpTransport;
 use battleship::protocol::GameApi;
-use battleship::domain::{GuessResult, GameStatus, Ship, SyncPayload};
+use battleship::domain::{GameStatus, GuessResult, Ship, SyncPayload};
 use battleship::{Skeleton, Stub};
 use tokio::net::TcpListener;
 
@@ -15,6 +15,9 @@ impl GameApi for DummyEngine {
         Ok(Ship { name: "dummy".to_string(), sunk: false, position: None })
     }
     async fn sync_state(&mut self, _payload: SyncPayload) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn resync(&mut self, _state: SyncPayload) -> anyhow::Result<()> {
         Ok(())
     }
     fn status(&self) -> GameStatus {

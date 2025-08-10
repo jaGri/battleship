@@ -178,6 +178,11 @@ impl crate::protocol::GameApi for GameEngine {
         Ok(())
     }
 
+    async fn resync(&mut self, _state: crate::domain::SyncPayload) -> anyhow::Result<()> {
+        // Resynchronisation is a no-op for now.
+        Ok(())
+    }
+
     fn status(&self) -> crate::domain::GameStatus {
         match GameEngine::status(self) {
             GameStatus::InProgress => crate::domain::GameStatus::InProgress,

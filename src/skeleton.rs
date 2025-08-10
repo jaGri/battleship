@@ -1,6 +1,7 @@
 #![cfg(feature = "std")]
 
 use crate::{protocol::GameApi, protocol::Message, transport::Transport};
+use anyhow::anyhow;
 
 pub struct Skeleton<E: GameApi, T: Transport> {
     engine: E,
@@ -12,6 +13,14 @@ impl<E: GameApi, T: Transport> Skeleton<E, T> {
         Self { engine, transport }
     }
     pub async fn run(&mut self) -> anyhow::Result<()> {
+        // Perform handshake
+        match self.transport.recv().await? {
+            Message::Hello { version, session } => {
+                self.transport.send(Message::Hello { version, session }).await?;
+            }
+            _ => return Err(anyhow!("Expected handshake")),
+        }
+
         while let Ok(msg) = self.transport.recv().await {
             let reply = match msg {
                 Message::Guess { x, y } => {
@@ -27,6 +36,7 @@ impl<E: GameApi, T: Transport> Skeleton<E, T> {
                     Message::ShipStatusResp(ship)
                 }
                 Message::Sync(payload) => { self.engine.sync_state(payload).await?; Message::Ack },
+                Message::Resync { state } => { self.engine.resync(state).await?; Message::Ack },
                 _ => Message::Ack,
             };
             self.transport.send(reply).await?;

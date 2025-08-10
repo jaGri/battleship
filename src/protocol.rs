@@ -7,6 +7,8 @@ pub use async_trait;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum Message {
+    /// Initial handshake containing protocol version and session identifier.
+    Hello { version: u32, session: u64 },
     /// Request to make a guess at the given coordinates.
     Guess { x: u8, y: u8 },
     /// Request the current game status.
@@ -15,6 +17,8 @@ pub enum Message {
     StatusResp(GuessResult),
     /// Synchronise state between peers.
     Sync(SyncPayload),
+    /// Full state resynchronisation.
+    Resync { state: SyncPayload },
     /// Request the status of a particular ship by id.
     ShipStatusReq { id: usize },
     /// Response containing the status of a ship.
@@ -32,5 +36,6 @@ pub trait GameApi: Send + Sync {
     async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<GuessResult>;
     async fn get_ship_status(&self, ship_id: usize) -> anyhow::Result<Ship>;
     async fn sync_state(&mut self, payload: SyncPayload) -> anyhow::Result<()>;
+    async fn resync(&mut self, state: SyncPayload) -> anyhow::Result<()>;
     fn status(&self) -> GameStatus;
 }
