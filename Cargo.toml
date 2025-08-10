@@ -17,3 +17,6 @@ serde_json = { version = "1", optional = true }
 [features]
 default = ["std"]
 std = ["rand/thread_rng", "anyhow/std", "tokio", "async-trait", "serde", "bincode", "serde_json"]
+
+[dev-dependencies]
+proptest = "1"
