@@ -3,9 +3,9 @@ fn main() {}
 
 #[cfg(feature = "std")]
 use battleship::{
-    calc_pdf, print_player_view, print_probability_board, ship_name_static,
-    transport::in_memory::InMemoryTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player,
-    PlayerNode,
+    print_player_view, print_probability_board, ship_name_static,
+    transport::in_memory::InMemoryTransport, AiPlayer, AiSuggestion, CliPlayer, GameEngine,
+    GameStatus, Player, PlayerNode,
 };
 
 #[cfg(feature = "std")]
@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let mut rng_cli = SmallRng::from_rng(&mut seed);
     let mut rng_ai = SmallRng::from_rng(&mut seed);
 
-    let mut cli = CliPlayer::new();
+    let mut cli = CliPlayer::with_hint(Box::new(AiSuggestion));
     let mut ai = AiPlayer::new();
     let mut cli_engine = GameEngine::new();
     let mut ai_engine = GameEngine::new();
@@ -54,19 +54,19 @@ async fn run_cli(
     loop {
         if my_turn {
             print_player_view(&engine);
-            let pdf = calc_pdf(
-                &engine.guess_hits(),
-                &engine.guess_misses(),
-                &engine.enemy_ship_lengths_remaining(),
-            );
-            print_probability_board(&pdf);
-
-            let (r, c) = player.select_target(
+            let hint = player.calc_pdf_and_guess(
                 &mut rng,
                 &engine.guess_hits(),
                 &engine.guess_misses(),
                 &engine.enemy_ship_lengths_remaining(),
             );
+            let (r, c) = match hint {
+                Some((pdf, guess)) => {
+                    print_probability_board(&pdf);
+                    player.select_target_with_hint(Some(guess))
+                }
+                None => player.select_target_with_hint(None),
+            };
             transport
                 .send(battleship::Message::Guess {
                     x: r as u8,
