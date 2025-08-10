@@ -17,3 +17,6 @@ libm = { version = "0.2", default-features = false }
 default = ["std"]
 std = ["rand/thread_rng", "anyhow/std", "tokio", "async-trait", "serde", "bincode"]
 ble = ["std"]
+
+[dev-dependencies]
+proptest = "1"

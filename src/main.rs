@@ -5,7 +5,7 @@ fn main() {}
 use battleship::{
     calc_pdf, print_player_view, print_probability_board, ship_name_static,
     transport::in_memory::InMemoryTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player,
-    PlayerNode,
+    PlayerNode, PROTOCOL_VERSION,
 };
 
 #[cfg(feature = "std")]
@@ -51,6 +51,7 @@ async fn run_cli(
     mut rng: SmallRng,
 ) -> anyhow::Result<()> {
     let mut my_turn = true;
+    let mut seq: u64 = 0;
     loop {
         if my_turn {
             print_player_view(&engine);
@@ -69,15 +70,20 @@ async fn run_cli(
             );
             transport
                 .send(battleship::Message::Guess {
+                    version: PROTOCOL_VERSION,
+                    seq,
                     x: r as u8,
                     y: c as u8,
                 })
                 .await?;
             let reply = transport.recv().await?;
             let res_domain = match reply {
-                battleship::Message::StatusResp(res) => res,
+                battleship::Message::StatusResp {
+                    seq: resp_seq, res, ..
+                } if resp_seq == seq => res,
                 _ => return Err(anyhow::anyhow!("unexpected reply")),
             };
+            seq += 1;
             let res_common = match res_domain {
                 battleship::domain::GuessResult::Hit => battleship::GuessResult::Hit,
                 battleship::domain::GuessResult::Miss => battleship::GuessResult::Miss,
@@ -94,15 +100,23 @@ async fn run_cli(
             my_turn = false;
         } else {
             let msg = transport.recv().await?;
-            if let battleship::Message::Guess { x, y } = msg {
+            if let battleship::Message::Guess {
+                seq: msg_seq, x, y, ..
+            } = msg
+            {
                 let res_common = engine
                     .opponent_guess(x as usize, y as usize)
                     .map_err(|e| anyhow::anyhow!(e))?;
                 player.handle_opponent_guess((x as usize, y as usize), res_common);
                 let res_domain = battleship::domain::GuessResult::from(res_common);
                 transport
-                    .send(battleship::Message::StatusResp(res_domain))
+                    .send(battleship::Message::StatusResp {
+                        version: PROTOCOL_VERSION,
+                        seq: msg_seq,
+                        res: res_domain,
+                    })
                     .await?;
+                seq = msg_seq + 1;
             } else {
                 continue;
             }
