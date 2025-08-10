@@ -1,5 +1,8 @@
 use crate::domain::*;
 
+/// Current protocol version.
+pub const PROTOCOL_VERSION: u8 = 1;
+
 #[cfg(feature = "std")]
 pub use async_trait;
 
@@ -8,23 +11,35 @@ pub use async_trait;
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum Message {
     /// Request to make a guess at the given coordinates.
-    Guess { x: u8, y: u8 },
+    Guess { version: u8, seq: u64, x: u8, y: u8 },
     /// Request the current game status.
-    StatusReq,
+    StatusReq { version: u8, seq: u64 },
     /// Response carrying the result of a guess.
-    StatusResp(GuessResult),
+    StatusResp {
+        version: u8,
+        seq: u64,
+        res: GuessResult,
+    },
     /// Synchronise state between peers.
-    Sync(SyncPayload),
+    Sync {
+        version: u8,
+        seq: u64,
+        payload: SyncPayload,
+    },
     /// Request the status of a particular ship by id.
-    ShipStatusReq { id: usize },
+    ShipStatusReq { version: u8, seq: u64, id: usize },
     /// Response containing the status of a ship.
-    ShipStatusResp(Ship),
+    ShipStatusResp { version: u8, seq: u64, ship: Ship },
     /// Request the overall game status.
-    GameStatusReq,
+    GameStatusReq { version: u8, seq: u64 },
     /// Response containing the current game status.
-    GameStatusResp(GameStatus),
+    GameStatusResp {
+        version: u8,
+        seq: u64,
+        status: GameStatus,
+    },
     /// Generic acknowledgement.
-    Ack,
+    Ack { version: u8, seq: u64 },
 }
 
 #[cfg_attr(feature = "std", async_trait::async_trait)]
