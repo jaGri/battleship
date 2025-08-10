@@ -17,3 +17,6 @@ log = { version = "0.4", optional = true }
 [features]
 default = ["std"]
 std = ["rand/thread_rng", "anyhow/std", "tokio", "async-trait", "serde", "bincode", "log"]
+
+[dev-dependencies]
+proptest = "1"

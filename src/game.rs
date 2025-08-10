@@ -10,6 +10,7 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 /// Public state of the player's guesses against the opponent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct GuessBoardState {
     pub hits: BB,
     pub misses: BB,
@@ -17,6 +18,7 @@ pub struct GuessBoardState {
 
 /// Serializable overall game state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameState {
     pub my_board: BoardState,
     pub my_guesses: GuessBoardState,
