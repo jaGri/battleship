@@ -14,6 +14,8 @@ mod game;
 mod player;
 mod player_ai;
 #[cfg(feature = "std")]
+mod logging;
+#[cfg(feature = "std")]
 mod player_cli;
 #[cfg(feature = "std")]
 pub mod player_node;
@@ -33,6 +35,8 @@ pub use config::*;
 pub use game::*;
 pub use player::*;
 pub use player_ai::*;
+#[cfg(feature = "std")]
+pub use logging::init_logging;
 #[cfg(feature = "std")]
 pub use player_cli::*;
 #[cfg(feature = "std")]

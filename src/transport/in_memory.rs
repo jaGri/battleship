@@ -33,6 +33,7 @@ impl InMemoryTransport {
 #[async_trait::async_trait]
 impl Transport for InMemoryTransport {
     async fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+        log::debug!("mem send: {:?}", msg);
         let mut queue = self.send_queue.lock().unwrap();
         queue.push_back(msg);
         Ok(())
@@ -44,6 +45,7 @@ impl Transport for InMemoryTransport {
                 let mut queue = self.recv_queue.lock().unwrap();
                 queue.pop_front()
             } {
+                log::debug!("mem recv: {:?}", msg);
                 return Ok(msg);
             }
             if Arc::strong_count(&self.recv_queue) == 1 {

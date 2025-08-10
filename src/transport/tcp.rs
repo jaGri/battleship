@@ -27,6 +27,7 @@ impl TcpTransport {
 #[async_trait::async_trait]
 impl Transport for TcpTransport {
     async fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+        log::debug!("tcp send: {:?}", msg);
         let data = bincode::serialize(&msg)?;
         let len = (data.len() as u32).to_be_bytes();
         self.stream.write_all(&len).await?;
@@ -41,6 +42,7 @@ impl Transport for TcpTransport {
         let mut buf = vec![0u8; len];
         self.stream.read_exact(&mut buf).await?;
         let msg = bincode::deserialize(&buf)?;
+        log::debug!("tcp recv: {:?}", msg);
         Ok(msg)
     }
 }
