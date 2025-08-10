@@ -4,11 +4,11 @@ use std::io::{self, Write};
 use std::string::String;
 
 use crate::{
-    ai,
     bitboard::BitBoard,
     board::Board,
     common::GuessResult,
     config::{BOARD_SIZE, NUM_SHIPS, SHIPS},
+    ui::{NoSuggestion, SuggestionProvider},
     GameEngine,
     BoardError,
 };
@@ -18,11 +18,63 @@ use crate::player::Player;
 
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
-pub struct CliPlayer;
+pub struct CliPlayer {
+    hint: Box<dyn SuggestionProvider>,
+}
 
 impl CliPlayer {
     pub fn new() -> Self {
-        Self
+        Self {
+            hint: Box::new(NoSuggestion),
+        }
+    }
+
+    /// Create a CLI player with a custom suggestion provider.
+    pub fn with_hint(hint: Box<dyn SuggestionProvider>) -> Self {
+        Self { hint }
+    }
+
+    /// Obtain a probability distribution and suggested guess from the provider.
+    pub fn calc_pdf_and_guess(
+        &mut self,
+        rng: &mut SmallRng,
+        hits: &BB,
+        misses: &BB,
+        remaining: &[usize; NUM_SHIPS as usize],
+    ) -> Option<(
+        [[f64; BOARD_SIZE as usize]; BOARD_SIZE as usize],
+        (usize, usize),
+    )> {
+        self.hint
+            .calc_pdf_and_guess(hits, misses, remaining, rng)
+    }
+
+    /// Select a target optionally showing a suggested coordinate.
+    pub fn select_target_with_hint(
+        &mut self,
+        suggestion: Option<(usize, usize)>,
+    ) -> (usize, usize) {
+        loop {
+            if let Some((sr, sc)) = suggestion {
+                std::print!("Enter guess [{}]: ", coord_to_string(sr, sc));
+            } else {
+                std::print!("Enter guess: ");
+            }
+            io::stdout().flush().unwrap();
+            let mut line = String::new();
+            io::stdin().read_line(&mut line).unwrap();
+            let line = line.trim();
+            if line.is_empty() {
+                if let Some((sr, sc)) = suggestion {
+                    return (sr, sc);
+                }
+            }
+            if let Some((r, c)) = parse_coord(line) {
+                return (r, c);
+            } else {
+                std::println!("Invalid coordinate");
+            }
+        }
     }
 }
 
@@ -94,24 +146,6 @@ fn print_guess_board(hits: &BB, misses: &BB) {
     }
 }
 
-/// Print a normalized probability distribution matrix.
-pub fn print_probability_board(pdf: &[[f64; BOARD_SIZE as usize]; BOARD_SIZE as usize]) {
-    std::println!("\nProbability distribution:");
-    std::print!("   ");
-    for c in 0..BOARD_SIZE as usize {
-        let ch = (b'A' + c as u8) as char;
-        std::print!(" {:>4}", ch);
-    }
-    std::println!();
-    for r in 0..BOARD_SIZE as usize {
-        std::print!("{:2} ", r + 1);
-        for c in 0..BOARD_SIZE as usize {
-            std::print!(" {:4.2}", pdf[r][c]);
-        }
-        std::println!();
-    }
-}
-
 /// Display the opponent board (top) and the player's board (bottom).
 pub fn print_player_view(engine: &GameEngine) {
     std::println!("Opponent board:");
@@ -160,28 +194,12 @@ impl Player for CliPlayer {
 
     fn select_target(
         &mut self,
-        rng: &mut SmallRng,
-        hits: &BB,
-        misses: &BB,
-        remaining: &[usize; NUM_SHIPS as usize],
+        _rng: &mut SmallRng,
+        _hits: &BB,
+        _misses: &BB,
+        _remaining: &[usize; NUM_SHIPS as usize],
     ) -> (usize, usize) {
-        let (sr, sc) = ai::calc_pdf_and_guess(hits, misses, remaining, rng);
-        loop {
-            // Show probability-based suggestion in brackets
-            std::print!("Enter guess [{}]: ", coord_to_string(sr, sc));
-            io::stdout().flush().unwrap();
-            let mut line = String::new();
-            io::stdin().read_line(&mut line).unwrap();
-            let line = line.trim();
-            if line.is_empty() {
-                return (sr, sc);
-            }
-            if let Some((r, c)) = parse_coord(line) {
-                return (r, c);
-            } else {
-                std::println!("Invalid coordinate");
-            }
-        }
+        self.select_target_with_hint(None)
     }
 
     fn handle_guess_result(&mut self, coord: (usize, usize), result: GuessResult) {

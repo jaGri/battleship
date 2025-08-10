@@ -16,6 +16,8 @@ mod player_ai;
 #[cfg(feature = "std")]
 mod player_cli;
 #[cfg(feature = "std")]
+mod ui;
+#[cfg(feature = "std")]
 pub mod player_node;
 pub mod protocol;
 mod ship;
@@ -35,6 +37,8 @@ pub use player::*;
 pub use player_ai::*;
 #[cfg(feature = "std")]
 pub use player_cli::*;
+#[cfg(feature = "std")]
+pub use ui::*;
 #[cfg(feature = "std")]
 pub use player_node::*;
 pub use protocol::*;
