@@ -17,6 +17,7 @@ mod player_ai;
 mod player_cli;
 #[cfg(feature = "std")]
 pub mod player_node;
+pub mod prelude;
 pub mod protocol;
 mod ship;
 pub mod skeleton;
