@@ -8,7 +8,9 @@ pub trait Transport: Send + Sync {
     async fn recv(&mut self) -> anyhow::Result<Message>;
 }
 
-#[cfg(feature = "std")]
-pub mod tcp;
+#[cfg(all(feature = "std", feature = "ble"))]
+pub mod ble;
 #[cfg(feature = "std")]
 pub mod in_memory;
+#[cfg(feature = "std")]
+pub mod tcp;
