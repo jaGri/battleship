@@ -16,7 +16,9 @@ pub enum Orientation {
 
 /// Public state of a ship on the board used for serialization or UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShipState {
+    #[cfg_attr(feature = "std", serde(skip))]
     pub name: &'static str,
     pub sunk: bool,
     pub position: Option<(usize, usize, Orientation)>,
