@@ -16,6 +16,7 @@ use rand::SeedableRng;
 #[cfg(feature = "std")]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    battleship::init_logging();
     let mut seed = rand::rng();
     let mut rng_cli = SmallRng::from_rng(&mut seed);
     let mut rng_ai = SmallRng::from_rng(&mut seed);
