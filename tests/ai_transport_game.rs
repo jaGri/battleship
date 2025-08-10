@@ -1,7 +1,4 @@
-use battleship::transport::in_memory::InMemoryTransport;
-use battleship::transport::Transport;
-use battleship::transport::tcp::TcpTransport;
-use battleship::{AiPlayer, GameEngine, GameStatus, Player, PlayerNode};
+use battleship::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use tokio::net::TcpListener;
@@ -29,7 +26,6 @@ async fn run_game(kind: TransportKind) -> anyhow::Result<()> {
             (Box::new(server), Box::new(client))
         }
     };
-
 
     let mut rng1 = SmallRng::seed_from_u64(1);
     let mut rng2 = SmallRng::seed_from_u64(2);
