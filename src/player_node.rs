@@ -6,8 +6,14 @@ use alloc::boxed::Box;
 use rand::rngs::SmallRng;
 
 use crate::{
-    common::GuessResult, config::ship_name_static, domain::GuessResult as DomainGuessResult,
-    game::GameStatus, player::Player, protocol::Message, transport::Transport, GameEngine,
+    common::GuessResult,
+    config::ship_name_static,
+    domain::GuessResult as DomainGuessResult,
+    game::GameStatus,
+    player::Player,
+    protocol::{Message, PROTOCOL_VERSION},
+    transport::Transport,
+    GameEngine,
 };
 
 pub struct PlayerNode {
@@ -27,6 +33,7 @@ impl PlayerNode {
 
     pub async fn run(&mut self, rng: &mut SmallRng, first_move: bool) -> anyhow::Result<()> {
         let mut my_turn = first_move;
+        let mut seq: u64 = 0;
         loop {
             if my_turn {
                 // Choose our guess and send to opponent
@@ -38,15 +45,20 @@ impl PlayerNode {
                 );
                 self.transport
                     .send(Message::Guess {
+                        version: PROTOCOL_VERSION,
+                        seq,
                         x: r as u8,
                         y: c as u8,
                     })
                     .await?;
                 let reply = self.transport.recv().await?;
                 let res_domain = match reply {
-                    Message::StatusResp(res) => res,
+                    Message::StatusResp {
+                        seq: resp_seq, res, ..
+                    } if resp_seq == seq => res,
                     _ => return Err(anyhow::anyhow!("unexpected reply")),
                 };
+                seq += 1;
                 let res_common = match res_domain {
                     DomainGuessResult::Hit => GuessResult::Hit,
                     DomainGuessResult::Miss => GuessResult::Miss,
@@ -64,7 +76,10 @@ impl PlayerNode {
             } else {
                 // Receive opponent guess and respond
                 let msg = self.transport.recv().await?;
-                if let Message::Guess { x, y } = msg {
+                if let Message::Guess {
+                    seq: msg_seq, x, y, ..
+                } = msg
+                {
                     let res_common = self
                         .engine
                         .opponent_guess(x as usize, y as usize)
@@ -72,11 +87,18 @@ impl PlayerNode {
                     self.player
                         .handle_opponent_guess((x as usize, y as usize), res_common);
                     let res_domain = DomainGuessResult::from(res_common);
-                    self.transport.send(Message::StatusResp(res_domain)).await?;
+                    self.transport
+                        .send(Message::StatusResp {
+                            version: PROTOCOL_VERSION,
+                            seq: msg_seq,
+                            res: res_domain,
+                        })
+                        .await?;
+                    my_turn = true;
+                    seq = msg_seq + 1;
                 } else {
                     continue;
                 }
-                my_turn = true;
             }
 
             if !matches!(self.engine.status(), GameStatus::InProgress) {
