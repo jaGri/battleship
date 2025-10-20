@@ -146,6 +146,10 @@ impl Board {
 
     /// Process a guess at (row, col), marking hits/misses and reporting result.
     pub fn guess(&mut self, row: usize, col: usize) -> Result<GuessResult, BoardError> {
+        // bounds check via BitBoard::get
+        let already_hit = self.hits.get(row, col)?;
+        let already_miss = self.misses.get(row, col)?;
+
         // prevent duplicates
         if self.hits.get(row, col)? || self.misses.get(row, col)? {
             return Err(BoardError::AlreadyGuessed);
