@@ -22,6 +22,10 @@ pub struct GuessBoardState {
 pub struct GameState {
     pub my_board: BoardState,
     pub my_guesses: GuessBoardState,
+    /// Which enemy ships remain afloat (by index)
+    pub enemy_ships_remaining: [bool; NUM_SHIPS as usize],
+    /// Number of enemy ship cells remaining
+    pub enemy_remaining: usize,
 }
 
 /// Current status of a game.
@@ -117,18 +121,19 @@ impl GameEngine {
                 hits: self.guess_hits,
                 misses: self.guess_misses,
             },
+            enemy_ships_remaining: self.enemy_ships_remaining,
+            enemy_remaining: self.enemy_remaining,
         }
     }
 
     /// Restore an engine from a previously saved state.
     pub fn from_state(state: GameState) -> Self {
-        let enemy_remaining = TOTAL_SHIP_CELLS - state.my_guesses.hits.count_ones();
         Self {
             board: Board::from(state.my_board),
             guess_hits: state.my_guesses.hits,
             guess_misses: state.my_guesses.misses,
-            enemy_remaining,
-            enemy_ships_remaining: [true; NUM_SHIPS as usize],
+            enemy_remaining: state.enemy_remaining,
+            enemy_ships_remaining: state.enemy_ships_remaining,
         }
     }
 
@@ -174,9 +179,14 @@ impl crate::protocol::GameApi for GameEngine {
         Ok(crate::domain::Ship::from(states[ship_id]))
     }
 
-    async fn sync_state(&mut self, _payload: crate::domain::SyncPayload) -> anyhow::Result<()> {
-        // Protocol payload is placeholder; simply sync using current state helpers
-        // when payloads carry real state in the future.
+    async fn sync_state(&mut self, payload: crate::domain::SyncPayload) -> anyhow::Result<()> {
+        // Restore engine state from the sync payload
+        let restored = Self::from_state(payload.game_state);
+        self.board = restored.board;
+        self.guess_hits = restored.guess_hits;
+        self.guess_misses = restored.guess_misses;
+        self.enemy_remaining = restored.enemy_remaining;
+        self.enemy_ships_remaining = restored.enemy_ships_remaining;
         Ok(())
     }
 

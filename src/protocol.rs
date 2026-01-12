@@ -10,6 +10,10 @@ pub use async_trait;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum Message {
+    /// Handshake message to establish connection and negotiate protocol version.
+    Handshake { version: u8 },
+    /// Acknowledgement of handshake with agreed version.
+    HandshakeAck { version: u8 },
     /// Request to make a guess at the given coordinates.
     Guess { version: u8, seq: u64, x: u8, y: u8 },
     /// Request the current game status.
@@ -40,6 +44,8 @@ pub enum Message {
     },
     /// Generic acknowledgement.
     Ack { version: u8, seq: u64 },
+    /// Heartbeat/keepalive to maintain connection.
+    Heartbeat { version: u8 },
 }
 
 #[cfg_attr(feature = "std", async_trait::async_trait)]

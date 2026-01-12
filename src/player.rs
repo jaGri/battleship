@@ -10,7 +10,7 @@ use rand::rngs::SmallRng;
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 /// Interface implemented by different player types.
-pub trait Player {
+pub trait Player: Send {
     /// Place all ships onto the provided board.
     fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError>;
 

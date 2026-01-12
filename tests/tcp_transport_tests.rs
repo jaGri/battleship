@@ -1,7 +1,7 @@
 use battleship::transport::tcp::TcpTransport;
 use battleship::protocol::GameApi;
 use battleship::domain::{GuessResult, GameStatus, Ship, SyncPayload};
-use battleship::{Skeleton, Stub};
+use battleship::{GameState, GuessBoardState, BoardState, BitBoard, Skeleton, Stub};
 use tokio::net::TcpListener;
 
 struct DummyEngine;
@@ -44,7 +44,31 @@ async fn test_stub_skeleton_tcp() -> anyhow::Result<()> {
     let ship = stub.get_ship_status(0).await?;
     assert_eq!(ship.name, "dummy");
 
-    stub.sync_state(SyncPayload).await?;
+    // Create a proper sync payload with game state
+    let sync_payload = SyncPayload {
+        game_state: GameState {
+            my_board: BoardState {
+                ship_states: [
+                    battleship::ShipState::new("Carrier"),
+                    battleship::ShipState::new("Battleship"),
+                    battleship::ShipState::new("Cruiser"),
+                    battleship::ShipState::new("Submarine"),
+                    battleship::ShipState::new("Destroyer"),
+                ],
+                ship_map: BitBoard::<u128, 10>::new(),
+                hits: BitBoard::<u128, 10>::new(),
+                misses: BitBoard::<u128, 10>::new(),
+            },
+            my_guesses: GuessBoardState {
+                hits: BitBoard::<u128, 10>::new(),
+                misses: BitBoard::<u128, 10>::new(),
+            },
+            enemy_ships_remaining: [true; 5],
+            enemy_remaining: 17,
+        },
+        enemy_ships_remaining: [true; 5],
+    };
+    stub.sync_state(sync_payload).await?;
 
     let status = stub.status();
     assert!(matches!(status, GameStatus::InProgress));

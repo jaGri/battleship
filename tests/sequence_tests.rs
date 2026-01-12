@@ -1,4 +1,5 @@
 use battleship::domain::{GameStatus, GuessResult, Ship, SyncPayload};
+use battleship::{GameState, GuessBoardState, BoardState, BitBoard};
 use battleship::protocol::GameApi;
 use battleship::transport::in_memory::InMemoryTransport;
 use battleship::transport::Transport;

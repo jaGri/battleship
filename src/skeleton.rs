@@ -22,6 +22,16 @@ impl<E: GameApi, T: Transport> Skeleton<E, T> {
     pub async fn run(&mut self) -> anyhow::Result<()> {
         while let Ok(msg) = self.transport.recv().await {
             match msg {
+                Message::Handshake { version } => {
+                    // Respond to handshake with ack
+                    self.transport
+                        .send(Message::HandshakeAck { version })
+                        .await?;
+                }
+                Message::HandshakeAck { .. } => {
+                    // Handshake ack received, continue
+                    continue;
+                }
                 Message::Guess { version, seq, x, y } => {
                     if version != PROTOCOL_VERSION || seq != self.next_seq {
                         self.transport
@@ -102,6 +112,14 @@ impl<E: GameApi, T: Transport> Skeleton<E, T> {
                         .send(Message::Ack {
                             version: PROTOCOL_VERSION,
                             seq,
+                        })
+                        .await?;
+                }
+                Message::Heartbeat { .. } => {
+                    // Heartbeat received, respond with heartbeat to keep connection alive
+                    self.transport
+                        .send(Message::Heartbeat {
+                            version: PROTOCOL_VERSION,
                         })
                         .await?;
                 }

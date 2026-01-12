@@ -31,7 +31,12 @@ pub enum GameStatus {
 
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
-pub struct SyncPayload; /* serialized state diff */
+pub struct SyncPayload {
+    /// Complete game state for full synchronization
+    pub game_state: crate::game::GameState,
+    /// Which enemy ships are still afloat (by index into SHIPS array)
+    pub enemy_ships_remaining: [bool; crate::config::NUM_SHIPS as usize],
+}
 
 impl From<crate::common::GuessResult> for GuessResult {
     fn from(res: crate::common::GuessResult) -> Self {
