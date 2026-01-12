@@ -44,7 +44,6 @@ Current snapshot of the Battleship codebase, its runtime flows, and suggested im
 
 - **State sync**: Implement `SyncPayload` and a real `GameApi::sync_state` to support reconnection/resume and to fix `enemy_ships_remaining` reconstruction (currently reset to all `true` in `GameEngine::from_state`).
 - **Authentication**: Consider adding auth or shared secrets for network games to prevent unauthorized connections.
-- **CLI/UX polish**: Extend the human CLI (currently minimal) with board rendering, input validation, and help text; add a flag to fix RNG seeds for reproducible games.
 - **AI evolution**: Explore adaptive temperature, salvo/targeting modes, and heuristics that chain hits into oriented hunts; add benchmarks to avoid regressions.
 - **Keepalive/heartbeat**: Implement active heartbeat messages for idle connection detection (message type exists but not yet used).
 - **Additional tests**: Integration tests for disconnect/reconnect scenarios, malformed frames, and cross-version play; property tests for `GameEngine::record_guess`/`from_state` round-tripping; fuzz bincode frames.
@@ -57,3 +56,4 @@ Current snapshot of the Battleship codebase, its runtime flows, and suggested im
 - ✅ **Player loop robustness**: Explicit handling of unexpected messages with session closure, detailed logging of version/sequence mismatches for debugging
 - ✅ **TCP transport**: Full implementation with `TcpTransport::connect()` and `TcpTransport::new()` supporting both client and server modes
 - ✅ **CLI interface**: Three-mode operation via clap (local/tcp-server/tcp-client) with configurable bind addresses and connection endpoints
+- ✅ **CLI/UX polish**: Enhanced board rendering with box-drawing characters and ship status; comprehensive input validation with bounds checking and duplicate guess detection; contextual help text for placement and targeting; RNG seed flag (--seed) for reproducible games across all commands

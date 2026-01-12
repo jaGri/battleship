@@ -36,13 +36,18 @@ enum PlayerType {
 #[cfg(feature = "std")]
 enum Commands {
     /// Play against an AI on the local machine.
-    Local,
+    Local {
+        #[arg(long, help = "Fix RNG seed for reproducible games (e.g., --seed 12345)")]
+        seed: Option<u64>,
+    },
     /// Host a networked game and wait for a client to connect.
     TcpServer {
         #[arg(long, default_value = "0.0.0.0:8080")]
         bind: String,
         #[arg(long, value_enum, default_value_t = PlayerType::Human)]
         player: PlayerType,
+        #[arg(long, help = "Fix RNG seed for reproducible games (e.g., --seed 12345)")]
+        seed: Option<u64>,
     },
     /// Connect to a networked game hosted by a server.
     TcpClient {
@@ -50,6 +55,8 @@ enum Commands {
         connect: String,
         #[arg(long, value_enum, default_value_t = PlayerType::Human)]
         player: PlayerType,
+        #[arg(long, help = "Fix RNG seed for reproducible games (e.g., --seed 12345)")]
+        seed: Option<u64>,
     },
 }
 
@@ -59,11 +66,23 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Local => {
+        Commands::Local { seed } => {
             println!("Starting local AI vs AI game...");
-            let mut seed = rand::rng();
-            let mut rng1 = SmallRng::from_rng(&mut seed);
-            let mut rng2 = SmallRng::from_rng(&mut seed);
+            if let Some(s) = seed {
+                println!("Using fixed seed: {} (game will be reproducible)", s);
+            }
+            let mut rng1 = if let Some(s) = seed {
+                SmallRng::seed_from_u64(s)
+            } else {
+                let mut seed_rng = rand::rng();
+                SmallRng::from_rng(&mut seed_rng)
+            };
+            let mut rng2 = if let Some(s) = seed {
+                SmallRng::seed_from_u64(s.wrapping_add(1))
+            } else {
+                let mut seed_rng = rand::rng();
+                SmallRng::from_rng(&mut seed_rng)
+            };
 
             let mut ai1 = AiPlayer::new();
             let mut ai2 = AiPlayer::new();
@@ -89,16 +108,23 @@ async fn main() -> anyhow::Result<()> {
 
             tokio::try_join!(ai1_future, ai2_future)?;
         }
-        Commands::TcpServer { bind, player } => {
+        Commands::TcpServer { bind, player, seed } => {
             println!("Starting TCP server at {}...", bind);
+            if let Some(s) = seed {
+                println!("Using fixed seed: {} (game will be reproducible)", s);
+            }
             let listener = TcpListener::bind(&bind).await?;
             println!("Waiting for a player to connect...");
             let (stream, addr) = listener.accept().await?;
             println!("Player connected from {}", addr);
 
             let transport = Box::new(TcpTransport::new(stream));
-            let mut seed = rand::rng();
-            let mut rng = SmallRng::from_rng(&mut seed);
+            let mut rng = if let Some(s) = seed {
+                SmallRng::seed_from_u64(s)
+            } else {
+                let mut seed_rng = rand::rng();
+                SmallRng::from_rng(&mut seed_rng)
+            };
             let mut engine = GameEngine::new();
 
             match player {
@@ -126,13 +152,20 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Commands::TcpClient { connect, player } => {
+        Commands::TcpClient { connect, player, seed } => {
             println!("Connecting to TCP server at {}...", connect);
+            if let Some(s) = seed {
+                println!("Using fixed seed: {} (game will be reproducible)", s);
+            }
             let transport = Box::new(TcpTransport::connect(&connect).await?);
             println!("Connected successfully!");
 
-            let mut seed = rand::rng();
-            let mut rng = SmallRng::from_rng(&mut seed);
+            let mut rng = if let Some(s) = seed {
+                SmallRng::seed_from_u64(s)
+            } else {
+                let mut seed_rng = rand::rng();
+                SmallRng::from_rng(&mut seed_rng)
+            };
             let mut engine = GameEngine::new();
 
             match player {
@@ -222,6 +255,9 @@ async fn run_cli(
     let mut expected_recv_seq: u64 = 0;
     loop {
         if my_turn {
+            std::println!("\n╔══════════════════════════════════════════════════════════╗");
+            std::println!("║                     YOUR TURN                            ║");
+            std::println!("╚══════════════════════════════════════════════════════════╝");
             print_player_view(&engine);
             let pdf = calc_pdf(
                 &engine.guess_hits(),
@@ -338,10 +374,19 @@ async fn run_cli(
             break;
         }
     }
+    std::println!("\n╔══════════════════════════════════════════════════════════╗");
+    std::println!("║                   GAME OVER                              ║");
+    std::println!("╚══════════════════════════════════════════════════════════╝\n");
     print_player_view(&engine);
     match engine.status() {
-        GameStatus::Won => println!("You won!"),
-        GameStatus::Lost => println!("You lost!"),
+        GameStatus::Won => {
+            std::println!("\n🎉🎉🎉 VICTORY! 🎉🎉🎉");
+            std::println!("You have sunk all enemy ships!");
+        }
+        GameStatus::Lost => {
+            std::println!("\n💀 DEFEAT 💀");
+            std::println!("All your ships have been destroyed.");
+        }
         _ => {}
     }
     Ok(())
