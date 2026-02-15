@@ -7,6 +7,7 @@ use crate::{
     ship::Orientation,
 };
 use libm::pow;
+use num_traits::float::FloatCore;
 use rand::Rng;
 
 /// Bitboard type alias for convenience.
