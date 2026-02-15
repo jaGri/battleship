@@ -1,2 +1,5 @@
 /target
 *.proptest-regressions
+
+# Planning documents (work in progress)
+docs/planning/

@@ -2,6 +2,97 @@
 
 Current snapshot of the Battleship codebase, its runtime flows, and suggested improvements.
 
+## Repository Structure
+
+```
+battleship/
+│
+├── Cargo.toml                           # Rust package manifest; library-first design with optional binary and std feature
+├── README.md                            # Project documentation and usage instructions
+├── overview.md                          # Architecture overview, execution flows, and development roadmap
+├── AGENTS.md                            # AI agent collaboration and task context
+│
+├── src/
+│   ├── lib.rs                           # Crate root; re-exports public API surface
+│   ├── main.rs                          # Binary entry point; CLI with local/tcp-server/tcp-client modes (std only)
+│   │
+│   ├── board.rs                         # Board state management using generic BitBoard for compact cell masks
+│   ├── ship.rs                          # Ship placement logic and definitions
+│   ├── bitboard.rs                      # Generic bitboard implementation for efficient set operations
+│   ├── game.rs                          # GameEngine orchestrating own board, guesses, and remaining ships
+│   ├── config.rs                        # Game configuration (10×10 board, ship sets, constants)
+│   │
+│   ├── player.rs                        # Player trait defining guess/status interface
+│   ├── player_ai.rs                     # AI implementation using probability density and temperature sampling
+│   ├── player_cli.rs                    # Human CLI player with input validation (std only)
+│   ├── player_node.rs                   # PlayerNode wrapper orchestrating player + engine + transport
+│   ├── ai.rs                            # AI heuristics: probability density over unguessed cells with hit bias
+│   │
+│   ├── protocol.rs                      # Wire protocol: versioned messages, handshake, sequence validation
+│   ├── domain.rs                        # Domain types bridging game logic to protocol messages
+│   ├── common.rs                        # Shared types and utilities
+│   │
+│   ├── cli.rs                           # CLI argument parsing and command structures (std only)
+│   ├── interface_cli.rs                 # CLI rendering: board display with box-drawing, ship status
+│   │
+│   ├── skeleton.rs                      # Framework/scaffolding code for future extensions
+│   ├── stub.rs                          # Placeholder implementations or stubs
+│   │
+│   └── transport/
+│       ├── mod.rs                       # Transport trait and module exports
+│       ├── in_memory.rs                 # In-memory channel transport for local AI vs AI games
+│       ├── tcp.rs                       # Length-prefixed TCP transport with bincode framing, timeouts
+│       └── heartbeat.rs                 # Heartbeat wrapper for active connection monitoring (10s interval, 45s timeout)
+│
+└── tests/
+    ├── ai_game_tests.rs                 # AI vs AI game scenarios and strategies
+    ├── ai_transport_game.rs             # AI games over transport layer
+    ├── bitboard_tests.rs                # Bitboard operations and edge cases
+    ├── board_props.rs                   # Property-based tests for board logic
+    ├── board_tests.rs                   # Unit tests for board state
+    ├── game_engine_props.rs             # Property-based tests for game engine
+    ├── game_state_serialization.rs      # Serialization/deserialization validation
+    │
+    ├── cli_test.rs                      # CLI interface and rendering tests
+    │
+    ├── in_memory_transport_tests.rs     # In-memory transport validation
+    ├── tcp_transport_tests.rs           # TCP transport connection and framing
+    ├── tcp_game_test.rs                 # End-to-end TCP game scenarios
+    ├── heartbeat_integration_test.rs    # Heartbeat monitoring for AI games
+    │
+    ├── protocol_hardening_tests.rs      # Handshake, version negotiation, timeout protection
+    ├── player_node_robustness_tests.rs  # Version/sequence mismatch handling, unexpected messages
+    ├── transport_resilience_tests.rs    # Graceful shutdown, bounded reads, error handling
+    ├── sequence_tests.rs                # Strict sequence number validation
+    ├── malformed_frame_tests.rs         # Invalid message format handling
+    ├── fuzz_bincode_tests.rs            # Fuzzing tests for bincode deserialization
+    ├── cross_version_tests.rs           # Protocol version compatibility tests
+    ├── disconnect_reconnect_tests.rs    # Connection failure and recovery scenarios
+    └── state_sync_tests.rs              # State synchronization message handling
+```
+
+### Key Architecture Points
+
+**Core Modules:**
+- **board.rs, ship.rs, bitboard.rs**: Game rules with compact bit-based state representation
+- **game.rs**: Central `GameEngine` managing game state and win/loss detection
+- **player.rs + implementations**: Trait-based player abstraction (AI, CLI)
+- **player_node.rs**: Orchestrates full turn loop with transport
+
+**Networking:**
+- **protocol.rs**: Versioned wire protocol with handshake, sequence validation, heartbeats
+- **transport/**: Abstract transport trait + in-memory and TCP implementations
+- **transport/heartbeat.rs**: Connection health monitoring wrapper
+
+**AI:**
+- **ai.rs, player_ai.rs**: Probability-driven targeting with hit bias and temperature sampling
+
+**Binary/CLI:**
+- **main.rs, cli.rs, interface_cli.rs**: Optional binary with three execution modes (requires std feature)
+
+**Testing:**
+- Comprehensive test suite covering unit, property-based, integration, and protocol hardening scenarios
+
 ## Architecture and Modules
 
 - **Crate setup**: Library-first design with optional binary; `no_std` compatible core gated by the `std` feature (default). Re-exports in [src/lib.rs](src/lib.rs) keep the public surface compact.
