@@ -67,6 +67,13 @@ Guidelines for AI agents working on this Rust Battleship implementation.
 - Close session on version/sequence mismatches
 - Use `anyhow::Context` for detailed error messages
 
+### Heartbeat Monitoring
+- Wrap TcpTransport with HeartbeatTransport for connection health monitoring
+- Use disabled() wrapper for InMemoryTransport (no heartbeat needed)
+- Default intervals: 10s heartbeat, 45s idle timeout
+- Heartbeats are transparent (filtered before returning to game logic)
+- tokio::select! multiplexes message receiving with periodic heartbeat sending
+
 ## AI Player
 
 - Probability maps are `[[f32; GRID_SIZE]; GRID_SIZE]`

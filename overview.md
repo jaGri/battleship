@@ -55,11 +55,6 @@ Current snapshot of the Battleship codebase, its runtime flows, and suggested im
   - Explore adaptive temperature based on game state
   - Add benchmarks to track AI performance and prevent regressions
 
-- **Active Heartbeat Implementation** 💓: Implement the heartbeat mechanism for connection health monitoring.
-  - Use existing `Message::Heartbeat` and `heartbeat_interval` field
-  - Detect and handle idle/dead connections gracefully
-  - Configure heartbeat frequency and idle timeout thresholds
-
 ### Medium Priority Features
 
 - **TLS/Encryption** 🔒: Add optional TLS support for encrypted TCP transport.
@@ -107,3 +102,4 @@ Current snapshot of the Battleship codebase, its runtime flows, and suggested im
 - ✅ **TCP transport**: Full implementation with `TcpTransport::connect()` and `TcpTransport::new()` supporting both client and server modes
 - ✅ **CLI interface**: Three-mode operation via clap (local/tcp-server/tcp-client) with configurable bind addresses and connection endpoints
 - ✅ **CLI/UX polish**: Enhanced board rendering with box-drawing characters and ship status; comprehensive input validation with bounds checking and duplicate guess detection; contextual help text for placement and targeting; RNG seed flag (--seed) for reproducible games across all commands
+- ✅ **Active heartbeat monitoring**: Periodic heartbeat messages with idle connection detection (10s interval, 45s timeout), automatic heartbeat echo, transparent filtering from game logic, graceful connection closure on timeout
