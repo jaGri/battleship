@@ -15,7 +15,8 @@
       "Bash(wc:*)",
       "Bash(git checkout:*)",
       "Bash(cargo check:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(git rm:*)"
     ]
   }
 }

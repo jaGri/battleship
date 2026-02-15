@@ -13,10 +13,11 @@ use crate::{
         GameEngine,
     },
     domain::GuessResult as DomainGuessResult,
-    player::Player,
     protocol::{Message, PROTOCOL_VERSION},
     transport::Transport,
 };
+
+use super::Player;
 
 pub struct PlayerNode {
     player: Box<dyn Player>,

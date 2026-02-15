@@ -8,7 +8,7 @@ use crate::core::{
 };
 use rand::rngs::SmallRng;
 
-use crate::player::Player;
+use super::Player;
 
 /// Simple AI player that uses probability based guessing.
 pub struct AiPlayer;

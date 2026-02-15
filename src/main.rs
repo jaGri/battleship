@@ -3,7 +3,8 @@ fn main() {}
 
 #[cfg(feature = "std")]
 use battleship::{
-    calc_pdf, print_player_view, print_probability_board, ship_name_static,
+    calc_pdf, ship_name_static,
+    player::cli::{print_player_view, print_probability_board},
     transport::in_memory::InMemoryTransport, transport::tcp::TcpTransport,
     HeartbeatTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player, PlayerNode,
     PROTOCOL_VERSION,

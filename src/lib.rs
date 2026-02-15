@@ -16,21 +16,13 @@ pub use core::{
 };
 
 // ========================================
-// Layer 2: Player & Transport (TODO)
+// Layer 2: Player & Transport
 // ========================================
-mod player;
-mod player_ai;
-#[cfg(feature = "std")]
-mod player_cli;
-#[cfg(feature = "std")]
-pub mod player_node;
+pub mod player;
+pub use player::{AiPlayer, Player};
 
-pub use player::*;
-pub use player_ai::*;
 #[cfg(feature = "std")]
-pub use player_cli::*;
-#[cfg(feature = "std")]
-pub use player_node::*;
+pub use player::{CliPlayer, PlayerNode};
 
 #[cfg(feature = "std")]
 pub mod transport;

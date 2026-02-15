@@ -14,7 +14,7 @@ use crate::core::{
 };
 use rand::rngs::SmallRng;
 
-use crate::player::Player;
+use super::Player;
 
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
