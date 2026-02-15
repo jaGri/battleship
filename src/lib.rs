@@ -40,3 +40,9 @@ pub mod protocol;
 
 #[cfg(feature = "std")]
 pub use protocol::{domain, GameApi, Message, Skeleton, Stub, PROTOCOL_VERSION};
+
+// ========================================
+// Layer 4: CLI
+// ========================================
+#[cfg(feature = "std")]
+pub mod cli;
