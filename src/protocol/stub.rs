@@ -1,10 +1,10 @@
 #![cfg(feature = "std")]
 
-use crate::domain::{GameStatus, GuessResult, Ship, SyncPayload};
-use crate::{
-    protocol::{GameApi, Message, PROTOCOL_VERSION},
-    transport::Transport,
+use super::{
+    domain::{GameStatus, GuessResult, Ship, SyncPayload},
+    GameApi, Message, PROTOCOL_VERSION,
 };
+use crate::transport::Transport;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::Mutex;
 

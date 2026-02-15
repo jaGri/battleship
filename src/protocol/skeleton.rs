@@ -1,9 +1,7 @@
 #![cfg(feature = "std")]
 
-use crate::{
-    protocol::{GameApi, Message, PROTOCOL_VERSION},
-    transport::Transport,
-};
+use super::{GameApi, Message, PROTOCOL_VERSION};
+use crate::transport::Transport;
 
 pub struct Skeleton<E: GameApi, T: Transport> {
     engine: E,

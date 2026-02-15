@@ -164,22 +164,22 @@ pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
 
 #[cfg_attr(feature = "std", async_trait::async_trait)]
 impl crate::protocol::GameApi for GameEngine {
-    async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<crate::domain::GuessResult> {
+    async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<crate::protocol::domain::GuessResult> {
         let res = self
             .opponent_guess(x as usize, y as usize)
             .map_err(|e| anyhow::anyhow!(e))?;
-        Ok(crate::domain::GuessResult::from(res))
+        Ok(crate::protocol::domain::GuessResult::from(res))
     }
 
-    async fn get_ship_status(&self, ship_id: usize) -> anyhow::Result<crate::domain::Ship> {
+    async fn get_ship_status(&self, ship_id: usize) -> anyhow::Result<crate::protocol::domain::Ship> {
         let states = self.board.ship_states();
         if ship_id >= states.len() {
             return Err(anyhow::anyhow!(BoardError::InvalidIndex));
         }
-        Ok(crate::domain::Ship::from(states[ship_id]))
+        Ok(crate::protocol::domain::Ship::from(states[ship_id]))
     }
 
-    async fn sync_state(&mut self, payload: crate::domain::SyncPayload) -> anyhow::Result<()> {
+    async fn sync_state(&mut self, payload: crate::protocol::domain::SyncPayload) -> anyhow::Result<()> {
         // Restore engine state from the sync payload
         let restored = Self::from_state(payload.game_state);
         self.board = restored.board;
@@ -190,11 +190,11 @@ impl crate::protocol::GameApi for GameEngine {
         Ok(())
     }
 
-    fn status(&self) -> crate::domain::GameStatus {
+    fn status(&self) -> crate::protocol::domain::GameStatus {
         match GameEngine::status(self) {
-            GameStatus::InProgress => crate::domain::GameStatus::InProgress,
-            GameStatus::Won => crate::domain::GameStatus::Won,
-            GameStatus::Lost => crate::domain::GameStatus::Lost,
+            GameStatus::InProgress => crate::protocol::domain::GameStatus::InProgress,
+            GameStatus::Won => crate::protocol::domain::GameStatus::Won,
+            GameStatus::Lost => crate::protocol::domain::GameStatus::Lost,
         }
     }
 }

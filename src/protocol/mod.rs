@@ -1,7 +1,26 @@
-use crate::domain::*;
+//! Network protocol definitions and RPC framework
+//!
+//! This module defines the protocol for communicating between game instances:
+//! - Message enum: All protocol messages (Handshake, Guess, StatusResp, etc.)
+//! - GameApi trait: RPC interface for game operations
+//! - Skeleton: Server-side RPC handler
+//! - Stub: Client-side RPC proxy
+//! - Domain types: Serializable versions of game types
+
+#![cfg(feature = "std")]
+
+pub mod domain;
+pub mod skeleton;
+pub mod stub;
+
+use domain::*;
 
 /// Current protocol version.
 pub const PROTOCOL_VERSION: u8 = 1;
+
+// Re-exports
+pub use skeleton::Skeleton;
+pub use stub::Stub;
 
 #[cfg(feature = "std")]
 pub use async_trait;

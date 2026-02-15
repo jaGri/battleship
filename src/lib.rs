@@ -33,15 +33,10 @@ pub use transport::tcp::TcpTransport;
 pub use transport::heartbeat::HeartbeatTransport;
 
 // ========================================
-// Layer 3: Protocol & RPC (TODO)
+// Layer 3: Protocol & RPC
 // ========================================
-pub mod domain;
+#[cfg(feature = "std")]
 pub mod protocol;
-pub mod skeleton;
-pub mod stub;
 
-pub use protocol::*;
 #[cfg(feature = "std")]
-pub use skeleton::*;
-#[cfg(feature = "std")]
-pub use stub::*;
+pub use protocol::{domain, GameApi, Message, Skeleton, Stub, PROTOCOL_VERSION};
