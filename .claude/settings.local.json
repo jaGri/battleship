@@ -12,7 +12,10 @@
       "Bash(git commit:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(git checkout:*)",
+      "Bash(cargo check:*)",
+      "Bash(git mv:*)"
     ]
   }
 }

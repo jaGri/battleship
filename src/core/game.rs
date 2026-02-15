@@ -1,4 +1,4 @@
-use crate::{
+use super::{
     bitboard::BitBoard,
     board::{Board, BoardState},
     common::{BoardError, GuessResult},

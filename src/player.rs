@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     bitboard::BitBoard,
     board::Board,
     common::GuessResult,

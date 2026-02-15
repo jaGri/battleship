@@ -10,7 +10,7 @@ pub struct Board {/* grid, ships, hits/misses */}
 pub struct Ship {
     pub name: String,
     pub sunk: bool,
-    pub position: Option<(u8, u8, crate::ship::Orientation)>,
+    pub position: Option<(u8, u8, crate::core::ship::Orientation)>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,23 +33,23 @@ pub enum GameStatus {
 #[derive(Debug, Clone)]
 pub struct SyncPayload {
     /// Complete game state for full synchronization
-    pub game_state: crate::game::GameState,
+    pub game_state: crate::core::game::GameState,
     /// Which enemy ships are still afloat (by index into SHIPS array)
-    pub enemy_ships_remaining: [bool; crate::config::NUM_SHIPS as usize],
+    pub enemy_ships_remaining: [bool; crate::core::config::NUM_SHIPS as usize],
 }
 
-impl From<crate::common::GuessResult> for GuessResult {
-    fn from(res: crate::common::GuessResult) -> Self {
+impl From<crate::core::common::GuessResult> for GuessResult {
+    fn from(res: crate::core::common::GuessResult) -> Self {
         match res {
-            crate::common::GuessResult::Hit => GuessResult::Hit,
-            crate::common::GuessResult::Miss => GuessResult::Miss,
-            crate::common::GuessResult::Sink(name) => GuessResult::Sink(name.to_string()),
+            crate::core::common::GuessResult::Hit => GuessResult::Hit,
+            crate::core::common::GuessResult::Miss => GuessResult::Miss,
+            crate::core::common::GuessResult::Sink(name) => GuessResult::Sink(name.to_string()),
         }
     }
 }
 
-impl From<crate::ship::ShipState> for Ship {
-    fn from(state: crate::ship::ShipState) -> Self {
+impl From<crate::core::ship::ShipState> for Ship {
+    fn from(state: crate::core::ship::ShipState) -> Self {
         Ship {
             name: state.name.to_string(),
             sunk: state.sunk,

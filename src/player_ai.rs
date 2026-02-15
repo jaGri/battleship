@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     ai,
     bitboard::BitBoard,
     board::Board,

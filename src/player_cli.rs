@@ -3,7 +3,7 @@
 use std::io::{self, Write};
 use std::string::String;
 
-use crate::{
+use crate::core::{
     ai,
     bitboard::BitBoard,
     board::Board,
@@ -219,9 +219,9 @@ impl Player for CliPlayer {
                     .unwrap_or('H');
                     
                 let o = if orient_ch == 'v' || orient_ch == 'V' {
-                    crate::ship::Orientation::Vertical
+                    crate::core::ship::Orientation::Vertical
                 } else if orient_ch == 'h' || orient_ch == 'H' {
-                    crate::ship::Orientation::Horizontal
+                    crate::core::ship::Orientation::Horizontal
                 } else {
                     std::println!("✗ Error: Invalid orientation '{}' - use H or V", orient_ch);
                     continue;

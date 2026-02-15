@@ -4,47 +4,52 @@
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
-mod ai;
-mod bitboard;
-mod board;
-mod common;
-mod config;
-pub mod domain;
-mod game;
+
+// ========================================
+// Layer 1: Core game engine (no_std)
+// ========================================
+pub mod core;
+
+// Convenience re-exports of core types
+pub use core::{
+    ai::*, bitboard::*, board::*, common::*, config::*, game::*, ship::*,
+};
+
+// ========================================
+// Layer 2: Player & Transport (TODO)
+// ========================================
 mod player;
 mod player_ai;
 #[cfg(feature = "std")]
 mod player_cli;
 #[cfg(feature = "std")]
 pub mod player_node;
-pub mod protocol;
-mod ship;
-pub mod skeleton;
-pub mod stub;
-#[cfg(feature = "std")]
-pub mod transport;
-//mod interface_cli;
 
-pub use ai::*;
-pub use bitboard::{BitBoard, BitBoardError};
-pub use board::*;
-pub use common::*;
-pub use config::*;
-pub use game::*;
 pub use player::*;
 pub use player_ai::*;
 #[cfg(feature = "std")]
 pub use player_cli::*;
 #[cfg(feature = "std")]
 pub use player_node::*;
-pub use protocol::*;
-pub use ship::*;
+
 #[cfg(feature = "std")]
-pub use skeleton::*;
-#[cfg(feature = "std")]
-pub use stub::*;
+pub mod transport;
+
 #[cfg(feature = "std")]
 pub use transport::tcp::TcpTransport;
 #[cfg(feature = "std")]
 pub use transport::heartbeat::HeartbeatTransport;
-//pub use interface_cli::*;
+
+// ========================================
+// Layer 3: Protocol & RPC (TODO)
+// ========================================
+pub mod domain;
+pub mod protocol;
+pub mod skeleton;
+pub mod stub;
+
+pub use protocol::*;
+#[cfg(feature = "std")]
+pub use skeleton::*;
+#[cfg(feature = "std")]
+pub use stub::*;

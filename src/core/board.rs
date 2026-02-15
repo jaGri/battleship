@@ -1,9 +1,9 @@
 //! Game board state, using updated `BitBoard` and `Ship` types.
 
-use crate::bitboard::BitBoard;
-use crate::common::{BoardError, GuessResult};
-use crate::config::{BOARD_SIZE, NUM_SHIPS, SHIPS};
-use crate::ship::{Orientation, Ship, ShipState};
+use super::bitboard::BitBoard;
+use super::common::{BoardError, GuessResult};
+use super::config::{BOARD_SIZE, NUM_SHIPS, SHIPS};
+use super::ship::{Orientation, Ship, ShipState};
 use core::fmt;
 use rand::Rng;
 

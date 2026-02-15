@@ -1,6 +1,6 @@
 //! Common types for Battleship: board errors and guess results.
 
-use crate::bitboard::BitBoardError;
+use super::bitboard::BitBoardError;
 
 /// Result of a guess attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

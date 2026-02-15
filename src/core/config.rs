@@ -1,4 +1,4 @@
-use crate::ship::ShipDef;
+use super::ship::ShipDef;
 
 pub const BOARD_SIZE: u8 = 10;
 pub const NUM_SHIPS: usize = 5;

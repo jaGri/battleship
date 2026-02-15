@@ -6,14 +6,16 @@ use alloc::boxed::Box;
 use rand::rngs::SmallRng;
 
 use crate::{
-    common::GuessResult,
-    config::ship_name_static,
+    core::{
+        common::GuessResult,
+        config::ship_name_static,
+        game::GameStatus,
+        GameEngine,
+    },
     domain::GuessResult as DomainGuessResult,
-    game::GameStatus,
     player::Player,
     protocol::{Message, PROTOCOL_VERSION},
     transport::Transport,
-    GameEngine,
 };
 
 pub struct PlayerNode {

@@ -1,7 +1,7 @@
 // Probability-based guessing logic for the opponent board.
 // Uses no_std and avoids heap allocations.
 
-use crate::{
+use super::{
     bitboard::BitBoard,
     config::{BOARD_SIZE, NUM_SHIPS},
     ship::Orientation,

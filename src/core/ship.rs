@@ -3,8 +3,8 @@
 use core::fmt;
 use num_traits::{PrimInt, Unsigned, Zero};
 
-use crate::bitboard::BitBoard;
-use crate::common::BoardError;
+use super::bitboard::BitBoard;
+use super::common::BoardError;
 
 /// Orientation of a ship on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
