@@ -42,12 +42,62 @@ Current snapshot of the Battleship codebase, its runtime flows, and suggested im
 
 ## Recommendations and Next Steps
 
-- **State sync**: Implement `SyncPayload` and a real `GameApi::sync_state` to support reconnection/resume and to fix `enemy_ships_remaining` reconstruction (currently reset to all `true` in `GameEngine::from_state`).
-- **Authentication**: Consider adding auth or shared secrets for network games to prevent unauthorized connections.
-- **AI evolution**: Explore adaptive temperature, salvo/targeting modes, and heuristics that chain hits into oriented hunts; add benchmarks to avoid regressions.
-- **Keepalive/heartbeat**: Implement active heartbeat messages for idle connection detection (message type exists but not yet used).
-- **Additional tests**: Integration tests for disconnect/reconnect scenarios, malformed frames, and cross-version play; property tests for `GameEngine::record_guess`/`from_state` round-tripping; fuzz bincode frames.
-- **TLS/encryption**: Add optional TLS support for encrypted TCP transport to protect game data in transit.
+### High Priority Features
+
+- **Authentication/Authorization** 🔐: Add authentication for network games to prevent unauthorized connections.
+  - Implement shared secret or token-based auth
+  - Add player identity verification
+  - Consider rate limiting to prevent abuse
+
+- **AI Evolution** 🤖: Enhance AI player with advanced targeting strategies.
+  - Implement oriented hunt mode after finding a hit (chain hits into lines)
+  - Add salvo/targeting modes for aggressive play
+  - Explore adaptive temperature based on game state
+  - Add benchmarks to track AI performance and prevent regressions
+
+- **Active Heartbeat Implementation** 💓: Implement the heartbeat mechanism for connection health monitoring.
+  - Use existing `Message::Heartbeat` and `heartbeat_interval` field
+  - Detect and handle idle/dead connections gracefully
+  - Configure heartbeat frequency and idle timeout thresholds
+
+### Medium Priority Features
+
+- **TLS/Encryption** 🔒: Add optional TLS support for encrypted TCP transport.
+  - Integrate `tokio-rustls` for TLS support
+  - Protect game data and credentials in transit
+  - Make TLS optional via feature flag
+
+- **Documentation & Examples** 📚: Expand project documentation for better onboarding.
+  - Add comprehensive README with usage examples
+  - Document network protocol specification
+  - Explain AI strategy and probability calculations
+  - Create deployment guide for server setup
+  - Add architecture diagrams (mermaid flowcharts)
+
+- **CI/CD Pipeline** 🔄: Automate testing and release process.
+  - Set up GitHub Actions for automated testing
+  - Add linting and format checks (clippy, rustfmt)
+  - Implement release automation with semantic versioning
+  - Add code coverage reporting
+
+### Long-Term Enhancements
+
+- **Benchmarking Suite** ⚡: Track and optimize performance over time.
+  - Add criterion.rs benchmarks for AI decision-making
+  - Benchmark serialization/deserialization performance
+  - Track bitboard operations performance
+
+- **Advanced Features** ✨: Extend gameplay and observability.
+  - Add spectator mode for watching games in progress
+  - Implement game replay functionality
+  - Add telemetry/metrics for game analysis
+  - Create web-based UI for browser play
+  - Support tournament mode with multiple concurrent games
+
+- **Platform Expansion** 🌐: Broaden deployment options.
+  - WebAssembly (WASM) compilation for browser support
+  - Mobile-friendly protocol (consider BLE transport completion)
+  - Cross-platform GUI using egui or iced
 
 ## Completed Features
 
