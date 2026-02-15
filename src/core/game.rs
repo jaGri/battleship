@@ -162,7 +162,8 @@ pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
     }
 }
 
-#[cfg_attr(feature = "std", async_trait::async_trait)]
+#[cfg(feature = "std")]
+#[async_trait::async_trait]
 impl crate::protocol::GameApi for GameEngine {
     async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<crate::protocol::domain::GuessResult> {
         let res = self
