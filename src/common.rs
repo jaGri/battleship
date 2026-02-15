@@ -55,3 +55,13 @@ impl core::fmt::Display for BoardError {
         }
     }
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for BoardError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            BoardError::BitBoardError(e) => Some(e),
+            _ => None,
+        }
+    }
+}

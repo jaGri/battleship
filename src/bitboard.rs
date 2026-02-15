@@ -35,6 +35,9 @@ impl core::fmt::Display for BitBoardError {
     }
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for BitBoardError {}
+
 /// A fixed-size N×N bitboard stored in the unsigned integer `T`.
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]

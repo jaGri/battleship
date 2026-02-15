@@ -1,7 +1,7 @@
 use battleship::protocol::GameApi;
 use battleship::{
     BitBoard, BoardState, GameEngine, GameState, GuessBoardState, ShipState,
-    BOARD_SIZE, NUM_SHIPS, SHIPS, TOTAL_SHIP_CELLS,
+    BOARD_SIZE, NUM_SHIPS, TOTAL_SHIP_CELLS,
 };
 use battleship::domain::SyncPayload;
 

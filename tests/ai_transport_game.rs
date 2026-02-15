@@ -12,7 +12,7 @@ enum TransportKind {
 }
 
 async fn run_game(kind: TransportKind) -> anyhow::Result<()> {
-    let (mut t1, mut t2): (Box<dyn Transport>, Box<dyn Transport>) = match kind {
+    let (t1, t2): (Box<dyn Transport>, Box<dyn Transport>) = match kind {
         TransportKind::InMemory => {
             let (t1, t2) = InMemoryTransport::pair();
             (Box::new(t1), Box::new(t2))

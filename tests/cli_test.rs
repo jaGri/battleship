@@ -1,7 +1,7 @@
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod cli_tests {
-    use battleship::{CliPlayer, GameEngine, Player};
+    use battleship::{CliPlayer, GameEngine};
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
@@ -14,9 +14,9 @@ mod cli_tests {
     #[test]
     fn test_cli_with_fixed_seed_placement() {
         // Test that CLI player can use board with fixed RNG seed
-        let mut rng = SmallRng::seed_from_u64(12345);
-        let mut player = CliPlayer::new();
-        let mut engine = GameEngine::new();
+        let _rng = SmallRng::seed_from_u64(12345);
+        let _player = CliPlayer::new();
+        let engine = GameEngine::new();
         
         // This would require stdin mocking for full test, but we can verify
         // the engine and player are properly initialized

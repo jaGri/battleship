@@ -26,6 +26,7 @@ pub struct TcpTransport {
     stream: TcpStream,
     timeout_duration: Duration,
     max_message_size: u32,
+    #[allow(dead_code)] // Reserved for future heartbeat implementation
     heartbeat_interval: Duration,
     idle_timeout: Duration,
     last_activity: Instant,

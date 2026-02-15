@@ -82,7 +82,7 @@ async fn test_sequence_validation() {
 
 #[tokio::test]
 async fn test_tcp_timeout() {
-    use tokio::time::{sleep, Duration};
+    use tokio::time::Duration;
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
