@@ -4,8 +4,9 @@ fn main() {}
 #[cfg(feature = "std")]
 use battleship::{
     calc_pdf, print_player_view, print_probability_board, ship_name_static,
-    transport::in_memory::InMemoryTransport, transport::tcp::TcpTransport, AiPlayer, CliPlayer,
-    GameEngine, GameStatus, Player, PlayerNode, PROTOCOL_VERSION,
+    transport::in_memory::InMemoryTransport, transport::tcp::TcpTransport,
+    HeartbeatTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player, PlayerNode,
+    PROTOCOL_VERSION,
 };
 
 #[cfg(feature = "std")]
@@ -16,6 +17,8 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 #[cfg(feature = "std")]
 use tokio::net::TcpListener;
+#[cfg(feature = "std")]
+use tokio::time::Duration;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -95,14 +98,16 @@ async fn main() -> anyhow::Result<()> {
                 .map_err(|e| anyhow::anyhow!(e))?;
 
             let (t1, t2) = InMemoryTransport::pair();
+            let transport1 = Box::new(HeartbeatTransport::disabled(t1));
+            let transport2 = Box::new(HeartbeatTransport::disabled(t2));
 
             let ai1_future = async move {
-                let mut node = PlayerNode::new(Box::new(ai1), engine1, Box::new(t1));
+                let mut node = PlayerNode::new(Box::new(ai1), engine1, transport1);
                 node.run(&mut rng1, true).await
             };
 
             let ai2_future = async move {
-                let mut node = PlayerNode::new(Box::new(ai2), engine2, Box::new(t2));
+                let mut node = PlayerNode::new(Box::new(ai2), engine2, transport2);
                 node.run(&mut rng2, false).await
             };
 
@@ -118,7 +123,11 @@ async fn main() -> anyhow::Result<()> {
             let (stream, addr) = listener.accept().await?;
             println!("Player connected from {}", addr);
 
-            let transport = Box::new(TcpTransport::new(stream));
+            let transport = Box::new(HeartbeatTransport::new(
+                TcpTransport::new(stream),
+                Duration::from_secs(10),
+                Duration::from_secs(45),
+            ));
             let mut rng = if let Some(s) = seed {
                 SmallRng::seed_from_u64(s)
             } else {
@@ -157,7 +166,12 @@ async fn main() -> anyhow::Result<()> {
             if let Some(s) = seed {
                 println!("Using fixed seed: {} (game will be reproducible)", s);
             }
-            let transport = Box::new(TcpTransport::connect(&connect).await?);
+            let tcp = TcpTransport::connect(&connect).await?;
+            let transport = Box::new(HeartbeatTransport::new(
+                tcp,
+                Duration::from_secs(10),
+                Duration::from_secs(45),
+            ));
             println!("Connected successfully!");
 
             let mut rng = if let Some(s) = seed {
