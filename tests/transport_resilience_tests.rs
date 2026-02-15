@@ -1,7 +1,7 @@
 /// Tests for transport resilience features.
 use battleship::{
     transport::{in_memory::InMemoryTransport, Transport},
-    TcpTransport,
+    TcpTransport, HeartbeatTransport,
     protocol::{Message, PROTOCOL_VERSION},
 };
 use tokio::net::TcpListener;
@@ -160,31 +160,36 @@ async fn test_tcp_idle_timeout() {
 async fn test_tcp_heartbeat() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    
+
     let server_task = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
-        let mut transport = TcpTransport::new(stream);
-        
-        // Receive heartbeat
+        let tcp = TcpTransport::new(stream);
+        let mut transport = HeartbeatTransport::new(tcp, Duration::from_millis(100), Duration::from_secs(5));
+
+        // Send a game message
+        transport.send(Message::Handshake { version: PROTOCOL_VERSION }).await.unwrap();
+
+        // Wait for heartbeats to be exchanged (automatically by HeartbeatTransport)
+        sleep(Duration::from_millis(250)).await;
+
+        // Receive game message (heartbeats are filtered)
         let msg = transport.recv().await.unwrap();
-        assert!(matches!(msg, Message::Heartbeat { version: PROTOCOL_VERSION }));
-        
-        // Send heartbeat response
-        transport.send_heartbeat().await.unwrap();
+        assert!(matches!(msg, Message::Handshake { .. }));
     });
-    
+
     let client_task = tokio::spawn(async move {
         let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        let mut transport = TcpTransport::new(stream);
-        
-        // Send heartbeat
-        transport.send_heartbeat().await.unwrap();
-        
-        // Receive heartbeat response
+        let tcp = TcpTransport::new(stream);
+        let mut transport = HeartbeatTransport::new(tcp, Duration::from_millis(100), Duration::from_secs(5));
+
+        // Receive game message (heartbeats are filtered)
         let msg = transport.recv().await.unwrap();
-        assert!(matches!(msg, Message::Heartbeat { version: PROTOCOL_VERSION }));
+        assert!(matches!(msg, Message::Handshake { .. }));
+
+        // Send a game message
+        transport.send(Message::Handshake { version: PROTOCOL_VERSION }).await.unwrap();
     });
-    
+
     server_task.await.unwrap();
     client_task.await.unwrap();
 }
@@ -238,4 +243,112 @@ async fn test_in_memory_explicit_close() {
     let result = t2.recv().await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("closed"));
+}
+
+#[tokio::test]
+async fn test_heartbeat_multiplexing() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server_task = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let tcp = TcpTransport::new(stream);
+        let mut transport = HeartbeatTransport::new(tcp, Duration::from_millis(50), Duration::from_secs(5));
+
+        // Send multiple game messages while heartbeats run in background
+        for i in 0..5 {
+            transport.send(Message::Handshake { version: i }).await.unwrap();
+            sleep(Duration::from_millis(30)).await;
+        }
+
+        // Receive responses
+        for i in 0..5 {
+            let msg = transport.recv().await.unwrap();
+            assert!(matches!(msg, Message::HandshakeAck { version } if version == i));
+        }
+    });
+
+    let client_task = tokio::spawn(async move {
+        let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let tcp = TcpTransport::new(stream);
+        let mut transport = HeartbeatTransport::new(tcp, Duration::from_millis(50), Duration::from_secs(5));
+
+        // Receive and respond to game messages
+        for i in 0..5 {
+            let msg = transport.recv().await.unwrap();
+            assert!(matches!(msg, Message::Handshake { version } if version == i));
+            transport.send(Message::HandshakeAck { version: i }).await.unwrap();
+        }
+    });
+
+    server_task.await.unwrap();
+    client_task.await.unwrap();
+}
+
+#[tokio::test]
+async fn test_heartbeat_idle_timeout() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server_task = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let tcp = TcpTransport::new(stream);
+        // Use very long heartbeat interval so it doesn't interfere with idle timeout
+        let mut transport = HeartbeatTransport::new(tcp, Duration::from_secs(100), Duration::from_millis(200));
+
+        // Wait for idle timeout to trigger
+        let result = transport.recv().await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("idle") || err_msg.contains("timeout"), "Expected idle timeout error, got: {}", err_msg);
+    });
+
+    let client_task = tokio::spawn(async move {
+        let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let tcp = TcpTransport::new(stream);
+        // Use very long heartbeat interval so it doesn't interfere with idle timeout
+        let mut transport = HeartbeatTransport::new(tcp, Duration::from_secs(100), Duration::from_millis(200));
+
+        // Don't send anything, wait for timeout
+        let result = transport.recv().await;
+        assert!(result.is_err());
+    });
+
+    server_task.await.unwrap();
+    client_task.await.unwrap();
+}
+
+#[tokio::test]
+async fn test_heartbeat_disabled() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server_task = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let tcp = TcpTransport::new(stream);
+        let mut transport = HeartbeatTransport::disabled(tcp);
+
+        // Send game message
+        transport.send(Message::Handshake { version: PROTOCOL_VERSION }).await.unwrap();
+
+        // Receive response
+        let msg = transport.recv().await.unwrap();
+        assert!(matches!(msg, Message::HandshakeAck { .. }));
+    });
+
+    let client_task = tokio::spawn(async move {
+        let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let tcp = TcpTransport::new(stream);
+        let mut transport = HeartbeatTransport::disabled(tcp);
+
+        // Receive message
+        let msg = transport.recv().await.unwrap();
+        assert!(matches!(msg, Message::Handshake { .. }));
+
+        // Send response
+        transport.send(Message::HandshakeAck { version: PROTOCOL_VERSION }).await.unwrap();
+    });
+
+    server_task.await.unwrap();
+    client_task.await.unwrap();
 }
