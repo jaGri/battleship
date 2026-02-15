@@ -12,3 +12,5 @@ pub trait Transport: Send + Sync {
 pub mod tcp;
 #[cfg(feature = "std")]
 pub mod in_memory;
+#[cfg(feature = "std")]
+pub mod heartbeat;

@@ -2,6 +2,11 @@
 
 Guidelines for AI agents working on this Rust Battleship implementation.
 
+## Coding Agent instructions
+- Do not use emojiis in code or documentation. Remove where they exist. 
+- Commit small, focused, modular changes to the local git repo after implementing and testing a change.
+- It is not necessary to run tests for non-code changes.
+
 ## Architecture Principles
 
 - **Library-first design**: Core logic in `src/lib.rs` with optional binary. Keep public API minimal.
@@ -62,7 +67,7 @@ Guidelines for AI agents working on this Rust Battleship implementation.
 - Close session on version/sequence mismatches
 - Use `anyhow::Context` for detailed error messages
 
-## AI Development
+## AI Player
 
 - Probability maps are `[[f32; GRID_SIZE]; GRID_SIZE]`
 - Temperature sampling for exploration (avoid greedy selection)
@@ -91,12 +96,12 @@ Message::Guess { version: PROTOCOL_VERSION, seq: my_seq, x, y }
 
 ## What to Avoid
 
-- ❌ Heap allocations in core game logic
-- ❌ Unwrapping without checking (use `?` or `unwrap_or`)
-- ❌ Breaking `no_std` compatibility in core modules
-- ❌ Direct TCP operations (use Transport trait)
-- ❌ Skipping git hooks or forcing destructive operations
-- ❌ Committing `*.proptest-regressions` files
+- Heap allocations in core game logic
+- Unwrapping without checking (use `?` or `unwrap_or`)
+- Breaking `no_std` compatibility in core modules
+- Direct TCP operations (use Transport trait)
+- Skipping git hooks or forcing destructive operations
+- Committing `*.proptest-regressions` files
 
 ## Documentation
 
@@ -111,3 +116,4 @@ Message::Guess { version: PROTOCOL_VERSION, seq: my_seq, x, y }
 - AI probability calculation is O(n²); keep grid traversals tight
 - Bincode serialization is fast; don't optimize prematurely
 - Add benchmarks (criterion) before performance work
+

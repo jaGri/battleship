@@ -45,4 +45,6 @@ pub use skeleton::*;
 pub use stub::*;
 #[cfg(feature = "std")]
 pub use transport::tcp::TcpTransport;
+#[cfg(feature = "std")]
+pub use transport::heartbeat::HeartbeatTransport;
 //pub use interface_cli::*;
