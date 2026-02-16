@@ -57,15 +57,15 @@ impl AiPlayer {
     /// Difficulty levels control both temperature (decision quality) and
     /// hit_weight (targeting aggressiveness):
     /// - Easy: temperature=2.0, hit_weight=3.0 (weak targeting)
-    /// - Medium: temperature=0.8, hit_weight=7.0 (balanced)
-    /// - Hard: temperature=0.4, hit_weight=10.0 (strong, default)
-    /// - Expert: temperature=0.15, hit_weight=15.0 (near-optimal)
+    /// - Medium: temperature=1.0, hit_weight=7.0 (balanced)
+    /// - Hard: temperature=0.5, hit_weight=10.0 (strong, default)
+    /// - Expert: temperature=0.2, hit_weight=13.0 (near-optimal)
     pub fn with_difficulty(difficulty: Difficulty) -> Self {
         let (temperature, hit_weight) = match difficulty {
             Difficulty::Easy => (2.0, 3.0),
-            Difficulty::Medium => (0.8, 7.0),
-            Difficulty::Hard => (0.4, 10.0),
-            Difficulty::Expert => (0.15, 15.0),
+            Difficulty::Medium => (1.0, 7.0),
+            Difficulty::Hard => (0.5, 10.0),
+            Difficulty::Expert => (0.2, 13.0),
         };
         Self {
             sunk: BB::new(),
