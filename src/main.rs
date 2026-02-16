@@ -6,8 +6,8 @@ use battleship::{
     calc_pdf, ship_name_static,
     player::cli::{print_player_view, print_probability_board},
     transport::in_memory::InMemoryTransport, transport::tcp::TcpTransport,
-    HeartbeatTransport, AiPlayer, CliPlayer, GameEngine, GameStatus, Player, PlayerNode,
-    PROTOCOL_VERSION,
+    HeartbeatTransport, AiPlayer, CliPlayer, Difficulty, GameEngine, GameStatus, Player,
+    PlayerNode, PROTOCOL_VERSION,
 };
 
 #[cfg(feature = "std")]
@@ -43,6 +43,8 @@ enum Commands {
     Local {
         #[arg(long, help = "Fix RNG seed for reproducible games (e.g., --seed 12345)")]
         seed: Option<u64>,
+        #[arg(long, value_enum, default_value_t = Difficulty::Hard, help = "AI difficulty level")]
+        difficulty: Difficulty,
     },
     /// Host a networked game and wait for a client to connect.
     TcpServer {
@@ -52,6 +54,8 @@ enum Commands {
         player: PlayerType,
         #[arg(long, help = "Fix RNG seed for reproducible games (e.g., --seed 12345)")]
         seed: Option<u64>,
+        #[arg(long, value_enum, default_value_t = Difficulty::Hard, help = "AI difficulty level (when player=ai)")]
+        difficulty: Difficulty,
     },
     /// Connect to a networked game hosted by a server.
     TcpClient {
@@ -61,6 +65,8 @@ enum Commands {
         player: PlayerType,
         #[arg(long, help = "Fix RNG seed for reproducible games (e.g., --seed 12345)")]
         seed: Option<u64>,
+        #[arg(long, value_enum, default_value_t = Difficulty::Hard, help = "AI difficulty level (when player=ai)")]
+        difficulty: Difficulty,
     },
 }
 
@@ -70,8 +76,9 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Local { seed } => {
+        Commands::Local { seed, difficulty } => {
             println!("Starting local AI vs AI game...");
+            println!("AI Difficulty: {:?}", difficulty);
             if let Some(s) = seed {
                 println!("Using fixed seed: {} (game will be reproducible)", s);
             }
@@ -88,8 +95,8 @@ async fn main() -> anyhow::Result<()> {
                 SmallRng::from_rng(&mut seed_rng)
             };
 
-            let mut ai1 = AiPlayer::new();
-            let mut ai2 = AiPlayer::new();
+            let mut ai1 = AiPlayer::with_difficulty(difficulty);
+            let mut ai2 = AiPlayer::with_difficulty(difficulty);
             let mut engine1 = GameEngine::new();
             let mut engine2 = GameEngine::new();
 
@@ -114,7 +121,12 @@ async fn main() -> anyhow::Result<()> {
 
             tokio::try_join!(ai1_future, ai2_future)?;
         }
-        Commands::TcpServer { bind, player, seed } => {
+        Commands::TcpServer {
+            bind,
+            player,
+            seed,
+            difficulty,
+        } => {
             println!("Starting TCP server at {}...", bind);
             if let Some(s) = seed {
                 println!("Using fixed seed: {} (game will be reproducible)", s);
@@ -149,8 +161,8 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 PlayerType::Ai => {
-                    println!("AI player selected.");
-                    let mut ai_player = AiPlayer::new();
+                    println!("AI player selected (Difficulty: {:?}).", difficulty);
+                    let mut ai_player = AiPlayer::with_difficulty(difficulty);
                     ai_player
                         .place_ships(&mut rng, engine.board_mut())
                         .map_err(|e| anyhow::anyhow!(e))?;
@@ -162,7 +174,12 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Commands::TcpClient { connect, player, seed } => {
+        Commands::TcpClient {
+            connect,
+            player,
+            seed,
+            difficulty,
+        } => {
             println!("Connecting to TCP server at {}...", connect);
             if let Some(s) = seed {
                 println!("Using fixed seed: {} (game will be reproducible)", s);
@@ -195,8 +212,8 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 PlayerType::Ai => {
-                    println!("AI player selected.");
-                    let mut ai_player = AiPlayer::new();
+                    println!("AI player selected (Difficulty: {:?}).", difficulty);
+                    let mut ai_player = AiPlayer::with_difficulty(difficulty);
                     ai_player
                         .place_ships(&mut rng, engine.board_mut())
                         .map_err(|e| anyhow::anyhow!(e))?;
@@ -274,10 +291,13 @@ async fn run_cli(
             std::println!("║                     YOUR TURN                            ║");
             std::println!("╚══════════════════════════════════════════════════════════╝");
             print_player_view(&engine);
+            let sunk = battleship::BitBoard::new(); // CLI doesn't track sunk ships
             let pdf = calc_pdf(
                 &engine.guess_hits(),
                 &engine.guess_misses(),
+                &sunk,
                 &engine.enemy_ship_lengths_remaining(),
+                10.0, // hit_weight
             );
             print_probability_board(&pdf);
 

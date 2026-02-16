@@ -19,7 +19,7 @@ pub use core::{
 // Layer 2: Player & Transport
 // ========================================
 pub mod player;
-pub use player::{AiPlayer, Player};
+pub use player::{AiPlayer, Difficulty, Player};
 
 #[cfg(feature = "std")]
 pub use player::{CliPlayer, PlayerNode};

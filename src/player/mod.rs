@@ -44,7 +44,7 @@ pub trait Player: Send {
 
 // Re-export implementations
 pub mod ai;
-pub use ai::AiPlayer;
+pub use ai::{AiPlayer, Difficulty};
 
 #[cfg(feature = "std")]
 pub mod cli;

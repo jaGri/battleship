@@ -251,7 +251,8 @@ impl Player for CliPlayer {
         misses: &BB,
         remaining: &[usize; NUM_SHIPS as usize],
     ) -> (usize, usize) {
-        let (sr, sc) = ai::calc_pdf_and_guess(hits, misses, remaining, rng);
+        let sunk = BB::new(); // CLI doesn't track sunk ships
+        let (sr, sc) = ai::calc_pdf_and_guess(hits, misses, &sunk, remaining, rng, 0.5, 10.0);
         loop {
             // Show probability-based suggestion in brackets
             std::print!("\nEnter target coordinates [AI suggests: {}] (or 'help'): ", 
