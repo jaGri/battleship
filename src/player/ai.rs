@@ -1,3 +1,6 @@
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
+
 use crate::core::{
     ai,
     bitboard::BitBoard,
