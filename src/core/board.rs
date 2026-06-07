@@ -20,7 +20,7 @@ pub struct BoardState {
 }
 
 /// Main board state: ship placements, hits, misses.
-
+#[derive(Clone)]
 pub struct Board {
     ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS as usize],
     ship_map: BB,

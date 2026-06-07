@@ -5,7 +5,7 @@ use std::string::{String, ToString};
 
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Board {/* grid, ships, hits/misses */}
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ship {
     pub name: String,
@@ -13,7 +13,7 @@ pub struct Ship {
     pub position: Option<(u8, u8, crate::core::ship::Orientation)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum GuessResult {
     Hit,
@@ -21,7 +21,7 @@ pub enum GuessResult {
     Sink(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum GameStatus {
     InProgress,
@@ -30,7 +30,7 @@ pub enum GameStatus {
 }
 
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncPayload {
     /// Complete game state for full synchronization
     pub game_state: crate::core::game::GameState,

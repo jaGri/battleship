@@ -7,10 +7,10 @@
 //! - Stub: Client-side RPC proxy
 //! - Domain types: Serializable versions of game types
 
-#![cfg(feature = "std")]
-
 pub mod domain;
+#[cfg(feature = "std")]
 pub mod skeleton;
+#[cfg(feature = "std")]
 pub mod stub;
 
 use domain::*;
@@ -19,16 +19,18 @@ use domain::*;
 pub const PROTOCOL_VERSION: u8 = 1;
 
 // Re-exports
+#[cfg(feature = "std")]
 pub use skeleton::Skeleton;
+#[cfg(feature = "std")]
 pub use stub::Stub;
 
 #[cfg(feature = "std")]
 pub use async_trait;
 
 /// Messages exchanged between the game engine and a remote client.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-pub enum Message {
+pub enum WireMessage {
     /// Handshake message to establish connection and negotiate protocol version.
     Handshake { version: u8 },
     /// Acknowledgement of handshake with agreed version.
@@ -67,7 +69,11 @@ pub enum Message {
     Heartbeat { version: u8 },
 }
 
+/// Transitional alias while transports and tests migrate to `WireMessage`.
+pub type Message = WireMessage;
+
 #[cfg_attr(feature = "std", async_trait::async_trait)]
+#[cfg(feature = "std")]
 pub trait GameApi: Send + Sync {
     async fn make_guess(&mut self, x: u8, y: u8) -> anyhow::Result<GuessResult>;
     async fn get_ship_status(&self, ship_id: usize) -> anyhow::Result<Ship>;

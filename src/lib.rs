@@ -19,11 +19,25 @@ pub use engine::{
 // ========================================
 // Layer 2: Player & Transport
 // ========================================
+pub mod agent;
+pub mod app;
+pub mod input;
+pub mod render;
+
+#[cfg(feature = "std")]
+pub mod render_cli;
+
 pub mod player;
 pub use player::{AiPlayer, Difficulty, Player};
+pub use agent::{AiAgent, AiDifficulty, HumanAgent, PlayerAgent, RemoteAgent, ScriptedAgent};
+pub use app::{AppCommand, AppEvent, AppState, BattleshipApp, MatchState, SavedGame};
+pub use input::{InputSource, UiEvent};
+pub use render::{Renderer, ScreenView};
 
 #[cfg(feature = "std")]
 pub use player::{CliPlayer, PlayerNode};
+#[cfg(feature = "std")]
+pub use render_cli::{CliInput, CliRenderer};
 
 #[cfg(feature = "std")]
 pub mod transport;
@@ -36,11 +50,11 @@ pub use transport::heartbeat::HeartbeatTransport;
 // ========================================
 // Layer 3: Protocol & RPC
 // ========================================
-#[cfg(feature = "std")]
 pub mod protocol;
 
+pub use protocol::{domain, Message, PROTOCOL_VERSION, WireMessage};
 #[cfg(feature = "std")]
-pub use protocol::{domain, GameApi, Message, Skeleton, Stub, PROTOCOL_VERSION};
+pub use protocol::{GameApi, Skeleton, Stub};
 
 // ========================================
 // Layer 4: CLI
