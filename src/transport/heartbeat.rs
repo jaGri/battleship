@@ -3,7 +3,7 @@
 use tokio::time::{interval, Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::protocol::{Message, PROTOCOL_VERSION};
+use crate::protocol::{WireMessage, PROTOCOL_VERSION};
 use crate::transport::Transport;
 
 /// Transport wrapper that adds active heartbeat monitoring and idle connection detection.
@@ -80,7 +80,7 @@ impl<T: Transport> HeartbeatTransport<T> {
 
 #[async_trait::async_trait]
 impl<T: Transport> Transport for HeartbeatTransport<T> {
-    async fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+    async fn send(&mut self, msg: WireMessage) -> anyhow::Result<()> {
         if self.shutdown.load(Ordering::SeqCst) {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
@@ -96,7 +96,7 @@ impl<T: Transport> Transport for HeartbeatTransport<T> {
         result
     }
 
-    async fn recv(&mut self) -> anyhow::Result<Message> {
+    async fn recv(&mut self) -> anyhow::Result<WireMessage> {
         if !self.enabled {
             // Fast path: no heartbeat logic, just delegate to inner transport
             return self.inner.recv().await;
@@ -114,7 +114,7 @@ impl<T: Transport> Transport for HeartbeatTransport<T> {
                 // Receive message from inner transport
                 msg_result = self.inner.recv() => {
                     match msg_result {
-                        Ok(Message::Heartbeat { version }) => {
+                        Ok(WireMessage::Heartbeat { version }) => {
                             // Validate protocol version
                             if version != PROTOCOL_VERSION {
                                 eprintln!(
@@ -129,7 +129,7 @@ impl<T: Transport> Transport for HeartbeatTransport<T> {
 
                             // Mark activity and echo heartbeat back
                             self.mark_activity();
-                            if let Err(e) = self.inner.send(Message::Heartbeat {
+                            if let Err(e) = self.inner.send(WireMessage::Heartbeat {
                                 version: PROTOCOL_VERSION
                             }).await {
                                 eprintln!("[HeartbeatTransport] Failed to echo heartbeat: {}", e);
@@ -163,7 +163,7 @@ impl<T: Transport> Transport for HeartbeatTransport<T> {
                     }
 
                     // Send heartbeat
-                    if let Err(e) = self.inner.send(Message::Heartbeat {
+                    if let Err(e) = self.inner.send(WireMessage::Heartbeat {
                         version: PROTOCOL_VERSION
                     }).await {
                         eprintln!("[HeartbeatTransport] Failed to send heartbeat: {}", e);

@@ -39,7 +39,6 @@ pub use player::{CliPlayer, PlayerNode};
 #[cfg(feature = "std")]
 pub use render_cli::{CliInput, CliRenderer};
 
-#[cfg(feature = "std")]
 pub mod transport;
 
 #[cfg(feature = "std")]

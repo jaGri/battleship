@@ -7,12 +7,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::yield_now;
 use tokio::time::{sleep, Duration};
 
-use crate::protocol::Message;
-use crate::transport::Transport;
+use crate::protocol::WireMessage;
+use crate::transport::{Transport, TransportEndpoint};
 
 /// State shared between paired transports.
 struct SharedState {
-    queue: VecDeque<Message>,
+    queue: VecDeque<WireMessage>,
     closed: bool,
 }
 
@@ -75,9 +75,43 @@ impl InMemoryTransport {
     }
 }
 
+impl TransportEndpoint for InMemoryTransport {
+    type Error = anyhow::Error;
+
+    fn poll(&mut self) -> Result<Option<WireMessage>, Self::Error> {
+        if self.is_shutdown() {
+            return Err(anyhow::anyhow!("Transport is shut down"));
+        }
+        let mut state = self
+            .recv_state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire receive lock"))?;
+        Ok(state.queue.pop_front())
+    }
+
+    fn send(&mut self, msg: &WireMessage) -> Result<(), Self::Error> {
+        if self.is_shutdown() {
+            return Err(anyhow::anyhow!("Transport is shut down"));
+        }
+        let mut state = self
+            .send_state
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire send lock"))?;
+        if state.closed {
+            return Err(anyhow::anyhow!("Channel closed by peer"));
+        }
+        state.queue.push_back(msg.clone());
+        Ok(())
+    }
+
+    fn is_connected(&self) -> bool {
+        !self.is_shutdown() && !self.is_peer_closed()
+    }
+}
+
 #[async_trait::async_trait]
 impl Transport for InMemoryTransport {
-    async fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+    async fn send(&mut self, msg: WireMessage) -> anyhow::Result<()> {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
@@ -93,7 +127,7 @@ impl Transport for InMemoryTransport {
         Ok(())
     }
 
-    async fn recv(&mut self) -> anyhow::Result<Message> {
+    async fn recv(&mut self) -> anyhow::Result<WireMessage> {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }

@@ -6,8 +6,8 @@ use tokio::time::{timeout, Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::protocol::{WireMessage, PROTOCOL_VERSION};
 use crate::transport::Transport;
-use crate::protocol::{Message, PROTOCOL_VERSION};
 
 /// Default timeout for network operations (30 seconds).
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -103,7 +103,7 @@ impl TcpTransport {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
         
-        let heartbeat = Message::Heartbeat { version: PROTOCOL_VERSION };
+        let heartbeat = WireMessage::Heartbeat { version: PROTOCOL_VERSION };
         self.send(heartbeat).await
     }
 
@@ -116,7 +116,7 @@ impl TcpTransport {
 #[cfg(feature = "std")]
 #[async_trait::async_trait]
 impl Transport for TcpTransport {
-    async fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+    async fn send(&mut self, msg: WireMessage) -> anyhow::Result<()> {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
@@ -173,7 +173,7 @@ impl Transport for TcpTransport {
         result
     }
 
-    async fn recv(&mut self) -> anyhow::Result<Message> {
+    async fn recv(&mut self) -> anyhow::Result<WireMessage> {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
