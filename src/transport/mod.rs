@@ -22,3 +22,7 @@ pub mod tcp;
 pub mod in_memory;
 #[cfg(feature = "std")]
 pub mod heartbeat;
+#[cfg(feature = "websocket")]
+pub mod websocket;
+#[cfg(feature = "ble")]
+pub mod ble;

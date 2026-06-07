@@ -33,16 +33,24 @@ pub use agent::{
 pub use app::{AppCommand, AppEvent, AppState, BattleshipApp, MatchState, SavedGame};
 pub use input::{InputSource, UiEvent};
 pub use render::{Renderer, ScreenView};
+#[cfg(feature = "persistence")]
+pub use persistence::{AdapterState, AgentSnapshot, SaveStore, UiSnapshot};
 
 #[cfg(feature = "std")]
 pub use render_cli::{CliInput, CliRenderer};
 
 pub mod transport;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "tcp")]
 pub use transport::tcp::TcpTransport;
 #[cfg(feature = "std")]
 pub use transport::heartbeat::HeartbeatTransport;
+
+#[cfg(feature = "persistence")]
+pub mod persistence;
+
+#[cfg(feature = "data-generation")]
+pub mod data_generation;
 
 // ========================================
 // Layer 3: Protocol & RPC

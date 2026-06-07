@@ -20,7 +20,7 @@ pub type Coordinate = (usize, usize);
 
 /// Difficulty level for AI agents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "std", derive(clap::ValueEnum, serde::Serialize, serde::Deserialize))]
 pub enum AiDifficulty {
     Easy,
     Medium,
