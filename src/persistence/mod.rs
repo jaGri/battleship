@@ -27,18 +27,13 @@ pub struct UiSnapshot {
 }
 
 /// Adapter-specific state saved alongside a game.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum AdapterState {
     Agent(AgentSnapshot),
     Ui(UiSnapshot),
+    #[default]
     None,
-}
-
-impl Default for AdapterState {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Simple active-save store used by app runners.

@@ -66,7 +66,7 @@ fn arb_guess_result() -> impl Strategy<Value = GuessResult> {
     prop_oneof![
         Just(GuessResult::Hit),
         Just(GuessResult::Miss),
-        any::<String>().prop_map(|name| GuessResult::Sink(name)),
+        any::<String>().prop_map(GuessResult::Sink),
     ]
 }
 

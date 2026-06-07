@@ -50,7 +50,7 @@ pub fn calc_pdf(
     hits: &BB,
     misses: &BB,
     sunk: &BB,
-    remaining_lengths: &[usize; NUM_SHIPS as usize],
+    remaining_lengths: &[usize; NUM_SHIPS],
     hit_weight: f64,
 ) -> [[f64; GRID_SIZE]; GRID_SIZE] {
     let mut matrix = [[0.0f64; GRID_SIZE]; GRID_SIZE];
@@ -140,16 +140,16 @@ fn normalize(mut matrix: [[f64; GRID_SIZE]; GRID_SIZE]) -> [[f64; GRID_SIZE]; GR
     }
     if total == 0.0 {
         let uniform = 1.0 / (GRID_SIZE * GRID_SIZE) as f64;
-        for r in 0..GRID_SIZE {
-            for c in 0..GRID_SIZE {
-                matrix[r][c] = uniform;
+        for row in matrix.iter_mut().take(GRID_SIZE) {
+            for cell in row.iter_mut().take(GRID_SIZE) {
+                *cell = uniform;
             }
         }
         return matrix;
     }
-    for r in 0..GRID_SIZE {
-        for c in 0..GRID_SIZE {
-            matrix[r][c] /= total;
+    for row in matrix.iter_mut().take(GRID_SIZE) {
+        for cell in row.iter_mut().take(GRID_SIZE) {
+            *cell /= total;
         }
     }
     matrix
@@ -169,14 +169,14 @@ pub fn sample_pdf<R: Rng + ?Sized>(
     rng: &mut R,
 ) -> (usize, usize) {
     // Clamp temperature to reasonable range to prevent numerical instability
-    let temp = temperature.max(0.01).min(10.0);
+    let temp = temperature.clamp(0.01, 10.0);
 
     let mut adjusted = [[0.0f64; GRID_SIZE]; GRID_SIZE];
     let mut total = 0.0;
-    for r in 0..GRID_SIZE {
-        for c in 0..GRID_SIZE {
+    for (r, row) in adjusted.iter_mut().enumerate().take(GRID_SIZE) {
+        for (c, cell) in row.iter_mut().enumerate().take(GRID_SIZE) {
             let v = pow(pdf[r][c], 1.0 / temp);
-            adjusted[r][c] = v;
+            *cell = v;
             total += v;
         }
     }
@@ -192,9 +192,9 @@ pub fn sample_pdf<R: Rng + ?Sized>(
     // Weighted sampling
     let threshold: f64 = rng.random_range(0.0..total);
     let mut cumulative = 0.0;
-    for r in 0..GRID_SIZE {
-        for c in 0..GRID_SIZE {
-            cumulative += adjusted[r][c];
+    for (r, row) in adjusted.iter().enumerate().take(GRID_SIZE) {
+        for (c, &cell) in row.iter().enumerate().take(GRID_SIZE) {
+            cumulative += cell;
             if threshold < cumulative {
                 return (r, c);
             }
@@ -214,7 +214,7 @@ pub fn calc_pdf_and_guess<R: Rng + ?Sized>(
     hits: &BB,
     misses: &BB,
     sunk: &BB,
-    lengths: &[usize; NUM_SHIPS as usize],
+    lengths: &[usize; NUM_SHIPS],
     rng: &mut R,
     temperature: f64,
     hit_weight: f64,

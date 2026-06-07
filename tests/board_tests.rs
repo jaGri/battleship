@@ -42,10 +42,10 @@ fn test_place_random_all_ships_no_overlap() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     let mut expected_bits = 0;
-    for i in 0..NUM_SHIPS as usize {
+    for (i, ship) in SHIPS.iter().enumerate().take(NUM_SHIPS) {
         let (r, c, orient) = board.random_placement(&mut rng, i).unwrap();
         board.place(i, r, c, orient).unwrap();
-        expected_bits += SHIPS[i].length();
+        expected_bits += ship.length();
     }
 
     assert_eq!(

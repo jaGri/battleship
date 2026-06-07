@@ -35,7 +35,7 @@ pub struct SyncPayload {
     /// Complete game state for full synchronization
     pub game_state: crate::core::game::GameState,
     /// Which enemy ships are still afloat (by index into SHIPS array)
-    pub enemy_ships_remaining: [bool; crate::core::config::NUM_SHIPS as usize],
+    pub enemy_ships_remaining: [bool; crate::core::config::NUM_SHIPS],
 }
 
 impl From<crate::core::common::GuessResult> for GuessResult {

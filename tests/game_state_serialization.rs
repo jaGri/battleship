@@ -10,7 +10,7 @@ proptest! {
     fn game_state_roundtrip(seed in any::<u64>()) {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut engine = GameEngine::new();
-        for i in 0..NUM_SHIPS as usize {
+        for i in 0..NUM_SHIPS {
             let (r, c, o) = engine.board().random_placement(&mut rng, i).unwrap();
             engine.board_mut().place(i, r, c, o).unwrap();
         }

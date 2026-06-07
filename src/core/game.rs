@@ -69,7 +69,7 @@ pub struct GameState {
     pub my_board: BoardState,
     pub my_guesses: GuessBoardState,
     /// Which enemy ships remain afloat (by index)
-    pub enemy_ships_remaining: [bool; NUM_SHIPS as usize],
+    pub enemy_ships_remaining: [bool; NUM_SHIPS],
     /// Number of enemy ship cells remaining
     pub enemy_remaining: usize,
 }
@@ -88,7 +88,7 @@ pub struct GameEngine {
     guess_hits: BB,
     guess_misses: BB,
     enemy_remaining: usize,
-    enemy_ships_remaining: [bool; NUM_SHIPS as usize],
+    enemy_ships_remaining: [bool; NUM_SHIPS],
 }
 
 impl Default for GameEngine {
@@ -105,7 +105,7 @@ impl GameEngine {
             guess_hits: BB::new(),
             guess_misses: BB::new(),
             enemy_remaining: TOTAL_SHIP_CELLS,
-            enemy_ships_remaining: [true; NUM_SHIPS as usize],
+            enemy_ships_remaining: [true; NUM_SHIPS],
         }
     }
 
@@ -208,8 +208,8 @@ impl GameEngine {
     /// Lengths of enemy ships that have not yet been sunk. Entries are zero
     /// for ships already sunk, maintaining fixed-size output for `no_std`
     /// callers.
-    pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
-        let mut lens = [0usize; NUM_SHIPS as usize];
+    pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS] {
+        let mut lens = [0usize; NUM_SHIPS];
         for (i, def) in SHIPS.iter().enumerate() {
             if self.enemy_ships_remaining[i] {
                 lens[i] = def.length();

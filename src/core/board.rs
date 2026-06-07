@@ -13,7 +13,7 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoardState {
-    pub ship_states: [ShipState; NUM_SHIPS as usize],
+    pub ship_states: [ShipState; NUM_SHIPS],
     pub ship_map: BB,
     pub hits: BB,
     pub misses: BB,
@@ -22,7 +22,7 @@ pub struct BoardState {
 /// Main board state: ship placements, hits, misses.
 #[derive(Clone)]
 pub struct Board {
-    ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS as usize],
+    ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS],
     ship_map: BB,
     hits: BB,
     misses: BB,
@@ -33,7 +33,7 @@ impl Board {
     pub fn new() -> Self {
         let empty = BB::new();
         Board {
-            ships: [None; NUM_SHIPS as usize],
+            ships: [None; NUM_SHIPS],
             ship_map: empty,
             hits: empty,
             misses: empty,
@@ -41,7 +41,7 @@ impl Board {
     }
 
     /// Returns the public state of each ship.
-    pub fn ship_states(&self) -> [ShipState; NUM_SHIPS as usize] {
+    pub fn ship_states(&self) -> [ShipState; NUM_SHIPS] {
         core::array::from_fn(|i| match &self.ships[i] {
             Some(s) => ShipState {
                 name: s.ship_type().name(),
@@ -86,7 +86,7 @@ impl Board {
         col: usize,
         orientation: Orientation,
     ) -> Result<(), BoardError> {
-        if ship_index >= NUM_SHIPS as usize {
+        if ship_index >= NUM_SHIPS {
             return Err(BoardError::InvalidIndex);
         }
         if self.ships[ship_index].is_some() {
@@ -100,7 +100,7 @@ impl Board {
             return Err(BoardError::ShipOverlaps);
         }
         // record placement
-        self.ship_map = self.ship_map | mask;
+        self.ship_map |= mask;
         self.ships[ship_index] = Some(ship);
         Ok(())
     }
@@ -111,7 +111,7 @@ impl Board {
         rng: &mut R,
         ship_index: usize,
     ) -> Result<(usize, usize, Orientation), BoardError> {
-        if ship_index >= NUM_SHIPS as usize {
+        if ship_index >= NUM_SHIPS {
             return Err(BoardError::InvalidIndex);
         }
         let def = SHIPS[ship_index];
@@ -155,16 +155,14 @@ impl Board {
             self.hits.set(row, col)?;
 
             // determine which ship was hit
-            for ship_opt in self.ships.iter_mut() {
-                if let Some(ship) = ship_opt {
-                    if ship.mask().get(row, col).unwrap_or(false) {
-                        let was_sunk = ship.is_sunk();
-                        ship.guess(row, col);
-                        if ship.is_sunk() && !was_sunk {
-                            return Ok(GuessResult::Sink(ship.ship_type().name()));
-                        }
-                        return Ok(GuessResult::Hit);
+            for ship in self.ships.iter_mut().flatten() {
+                if ship.mask().get(row, col).unwrap_or(false) {
+                    let was_sunk = ship.is_sunk();
+                    ship.guess(row, col);
+                    if ship.is_sunk() && !was_sunk {
+                        return Ok(GuessResult::Sink(ship.ship_type().name()));
                     }
+                    return Ok(GuessResult::Hit);
                 }
             }
             // should have found a ship; fallback
@@ -173,6 +171,12 @@ impl Board {
             self.misses.set(row, col)?;
             Ok(GuessResult::Miss)
         }
+    }
+}
+
+impl Default for Board {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -203,8 +207,7 @@ impl From<BoardState> for Board {
         board.ship_map = state.ship_map;
         board.hits = state.hits;
         board.misses = state.misses;
-        for i in 0..NUM_SHIPS as usize {
-            let def = SHIPS[i];
+        for (i, &def) in SHIPS.iter().enumerate().take(NUM_SHIPS) {
             if let Some(ship) =
                 Ship::<u128, { BOARD_SIZE as usize }>::from_state(&state.ship_states[i], def)
                     .unwrap()

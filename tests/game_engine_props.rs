@@ -7,7 +7,7 @@ fn random_engine(seed: u64) -> GameEngine {
     let mut engine = GameEngine::new();
 
     // Place ships on board
-    for i in 0..NUM_SHIPS as usize {
+    for i in 0..NUM_SHIPS {
         let (r, c, orient) = engine.board_mut().random_placement(&mut rng, i).unwrap();
         engine.board_mut().place(i, r, c, orient).unwrap();
     }
@@ -115,12 +115,12 @@ proptest! {
 
     /// Test that recording sunk ships properly updates enemy_ships_remaining
     #[test]
-    fn record_sink_roundtrip(seed in any::<u64>(), ship_idx in 0..NUM_SHIPS as usize) {
+    fn record_sink_roundtrip(seed in any::<u64>(), ship_idx in 0..NUM_SHIPS) {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut engine = GameEngine::new();
 
         // Place ships
-        for i in 0..NUM_SHIPS as usize {
+        for i in 0..NUM_SHIPS {
             let (r, c, orient) = engine.board_mut().random_placement(&mut rng, i).unwrap();
             engine.board_mut().place(i, r, c, orient).unwrap();
         }
@@ -157,7 +157,7 @@ proptest! {
         let mut engine = GameEngine::new();
 
         // Place ships
-        for i in 0..NUM_SHIPS as usize {
+        for i in 0..NUM_SHIPS {
             let (r, c, orient) = engine.board_mut().random_placement(&mut rng, i).unwrap();
             engine.board_mut().place(i, r, c, orient).unwrap();
         }

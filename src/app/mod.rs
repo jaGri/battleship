@@ -37,6 +37,7 @@ pub enum AppState {
 
 /// Events accepted by the app.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum AppEvent {
     Ui(UiEvent),
     Agent(AgentAction),
@@ -53,6 +54,7 @@ pub enum AgentPrompt {
 }
 
 /// Commands emitted by the app runner.
+#[allow(clippy::large_enum_variant)]
 pub enum AppCommand {
     Render,
     Send(WireMessage),

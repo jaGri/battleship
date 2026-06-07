@@ -5,7 +5,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 fn random_board(seed: u64) -> Board {
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut board = Board::new();
-    for i in 0..NUM_SHIPS as usize {
+    for i in 0..NUM_SHIPS {
         let (r, c, orient) = board.random_placement(&mut rng, i).unwrap();
         board.place(i, r, c, orient).unwrap();
     }
@@ -34,7 +34,7 @@ proptest! {
     fn guess_idempotent(seed in any::<u64>(), row in 0..BOARD_SIZE as usize, col in 0..BOARD_SIZE as usize) {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut board = Board::new();
-        for i in 0..NUM_SHIPS as usize {
+        for i in 0..NUM_SHIPS {
             let (r, c, orient) = board.random_placement(&mut rng, i).unwrap();
             board.place(i, r, c, orient).unwrap();
         }

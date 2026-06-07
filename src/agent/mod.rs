@@ -142,7 +142,7 @@ impl AiAgent {
     }
 
     pub fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError> {
-        for i in 0..NUM_SHIPS as usize {
+        for i in 0..NUM_SHIPS {
             let (r, c, o) = board.random_placement(rng, i)?;
             board.place(i, r, c, o)?;
         }
@@ -157,8 +157,8 @@ impl AiAgent {
     ) -> Coordinate {
         self.current_hits = guess_board.hits;
 
-        let mut lengths = [0usize; NUM_SHIPS as usize];
-        for (idx, &length) in remaining.iter().enumerate().take(NUM_SHIPS as usize) {
+        let mut lengths = [0usize; NUM_SHIPS];
+        for (idx, &length) in remaining.iter().enumerate().take(NUM_SHIPS) {
             lengths[idx] = length;
         }
 
@@ -362,7 +362,7 @@ impl PlayerAgent for HumanAgent {
         match request {
             AgentRequest::PlaceShips { board } => {
                 let mut probe = board.clone();
-                for ship_index in 0..NUM_SHIPS as usize {
+                for ship_index in 0..NUM_SHIPS {
                     let (row, col, orientation) = probe.random_placement(rng, ship_index)?;
                     probe.place(ship_index, row, col, orientation)?;
                 }

@@ -158,7 +158,7 @@ where
 
     /// Creates a bitboard from an iterator over `(row, col)` positions.
     #[inline]
-    pub fn from_iter<I>(iter: I) -> Result<Self, BitBoardError>
+    pub fn try_from_iter<I>(iter: I) -> Result<Self, BitBoardError>
     where
         I: IntoIterator<Item = (usize, usize)>,
     {
