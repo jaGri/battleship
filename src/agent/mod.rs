@@ -341,12 +341,39 @@ impl PlayerAgent for AiAgent {
 #[derive(Default)]
 pub struct HumanAgent {
     pending_target: Option<Coordinate>,
+    pending_placements: Vec<ShipPlacement>,
+    random_placement_requested: bool,
 }
 
 impl HumanAgent {
     pub fn on_ui_event(&mut self, event: UiEvent) {
-        if let UiEvent::Target(coord) = event {
-            self.pending_target = Some(coord);
+        match event {
+            UiEvent::Target(coord) => {
+                self.pending_target = Some(coord);
+            }
+            UiEvent::RandomPlacement => {
+                self.pending_placements.clear();
+                self.random_placement_requested = true;
+            }
+            UiEvent::ClearPlacements => {
+                self.pending_placements.clear();
+                self.random_placement_requested = false;
+            }
+            UiEvent::PlaceShip {
+                ship_index,
+                row,
+                col,
+                orientation,
+            } => {
+                self.random_placement_requested = false;
+                self.pending_placements.push(ShipPlacement {
+                    ship_index,
+                    row,
+                    col,
+                    orientation,
+                });
+            }
+            _ => {}
         }
     }
 }
@@ -361,11 +388,17 @@ impl PlayerAgent for HumanAgent {
     ) -> Result<AgentAction, Self::Error> {
         match request {
             AgentRequest::PlaceShips { board } => {
+                if self.pending_placements.len() == NUM_SHIPS && !self.random_placement_requested {
+                    let placements = core::mem::take(&mut self.pending_placements);
+                    return Ok(AgentAction::PlaceShips(placements));
+                }
+
                 let mut probe = board.clone();
                 for ship_index in 0..NUM_SHIPS {
                     let (row, col, orientation) = probe.random_placement(rng, ship_index)?;
                     probe.place(ship_index, row, col, orientation)?;
                 }
+                self.random_placement_requested = false;
                 let placements = probe
                     .ship_states()
                     .iter()

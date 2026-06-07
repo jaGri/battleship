@@ -5,7 +5,7 @@ use battleship::{
     AppEvent, BattleshipApp, Board, GameStatus, GuessBoard, InputSource, Orientation, Renderer,
     ScreenView, ScriptedAgent, UiEvent, WebBoardCell, WebConnectionView, WebGameEvent,
     WebGameStatus, WebGuessCell, WebGuessResult, WebInput, WebInputError, WebInputEvent,
-    WebMenuView, WebMessageView, WebRenderer, WebScreenView, BOARD_SIZE,
+    WebMenuView, WebMessageView, WebOrientation, WebRenderer, WebScreenView, BOARD_SIZE,
 };
 
 fn board_with_visible_states() -> Board {
@@ -50,6 +50,22 @@ fn web_input_events_map_to_ui_events() {
             WebInputEvent::Target { row: 3, col: 4 },
             UiEvent::Target((3, 4)),
         ),
+        (WebInputEvent::RandomPlacement, UiEvent::RandomPlacement),
+        (WebInputEvent::ClearPlacements, UiEvent::ClearPlacements),
+        (
+            WebInputEvent::PlaceShip {
+                ship_index: 2,
+                row: 3,
+                col: 4,
+                orientation: WebOrientation::Vertical,
+            },
+            UiEvent::PlaceShip {
+                ship_index: 2,
+                row: 3,
+                col: 4,
+                orientation: Orientation::Vertical,
+            },
+        ),
     ];
 
     let mut input = WebInput::new();
@@ -83,6 +99,29 @@ fn web_input_rejects_out_of_bounds_targets_without_enqueueing() {
     );
     assert!(input.is_empty());
     assert_eq!(input.poll_input().unwrap(), None);
+}
+
+#[test]
+fn web_input_rejects_out_of_bounds_placements_without_enqueueing() {
+    let mut input = WebInput::new();
+
+    let err = input
+        .push_event(WebInputEvent::PlaceShip {
+            ship_index: 0,
+            row: BOARD_SIZE as usize,
+            col: 0,
+            orientation: WebOrientation::Horizontal,
+        })
+        .unwrap_err();
+
+    assert_eq!(
+        err,
+        WebInputError::PlacementOutOfBounds {
+            row: BOARD_SIZE as usize,
+            col: 0
+        }
+    );
+    assert!(input.is_empty());
 }
 
 #[test]
@@ -150,11 +189,13 @@ fn web_renderer_preserves_owned_non_game_views() {
             title: "Battleship",
             items: &menu_items,
             selected: 1,
+            notice: Some("Current: Hard"),
         })),
         WebScreenView::Menu(WebMenuView {
             title: "Battleship".to_string(),
             items: vec!["Solo Game".to_string(), "Remote Game".to_string()],
             selected: 1,
+            notice: Some("Current: Hard".to_string()),
         })
     );
 

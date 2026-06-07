@@ -18,6 +18,7 @@ pub struct MenuView<'a> {
     pub title: &'a str,
     pub items: &'a [&'a str],
     pub selected: usize,
+    pub notice: Option<&'a str>,
 }
 
 /// In-game view model.

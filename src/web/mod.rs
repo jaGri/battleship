@@ -15,7 +15,9 @@ use std::fmt;
 use std::string::{String, ToString};
 use std::vec::Vec;
 
-use crate::engine::{Board, GameStatus, GuessBoard, GuessResult, Orientation, BOARD_SIZE, SHIPS};
+use crate::engine::{
+    Board, GameStatus, GuessBoard, GuessResult, Orientation, BOARD_SIZE, NUM_SHIPS, SHIPS,
+};
 use crate::input::{InputSource, UiEvent};
 use crate::render::{
     ConnectionView, GameEventView, GameView, MenuView, MessageView, Renderer, ScreenView,
@@ -34,13 +36,26 @@ pub enum WebInputEvent {
     Start,
     ConnectionMenu,
     Tick,
-    Target { row: usize, col: usize },
+    Target {
+        row: usize,
+        col: usize,
+    },
+    RandomPlacement,
+    ClearPlacements,
+    PlaceShip {
+        ship_index: usize,
+        row: usize,
+        col: usize,
+        orientation: WebOrientation,
+    },
 }
 
 /// Error returned when a browser event cannot be normalized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WebInputError {
     TargetOutOfBounds { row: usize, col: usize },
+    PlacementOutOfBounds { row: usize, col: usize },
+    ShipIndexOutOfBounds { ship_index: usize },
 }
 
 impl fmt::Display for WebInputError {
@@ -48,6 +63,12 @@ impl fmt::Display for WebInputError {
         match self {
             Self::TargetOutOfBounds { row, col } => {
                 write!(f, "target out of bounds: row={}, col={}", row, col)
+            }
+            Self::PlacementOutOfBounds { row, col } => {
+                write!(f, "placement out of bounds: row={}, col={}", row, col)
+            }
+            Self::ShipIndexOutOfBounds { ship_index } => {
+                write!(f, "ship index out of bounds: ship_index={}", ship_index)
             }
         }
     }
@@ -110,6 +131,27 @@ fn normalize_input_event(event: WebInputEvent) -> Result<UiEvent, WebInputError>
             } else {
                 Err(WebInputError::TargetOutOfBounds { row, col })
             }
+        }
+        WebInputEvent::RandomPlacement => Ok(UiEvent::RandomPlacement),
+        WebInputEvent::ClearPlacements => Ok(UiEvent::ClearPlacements),
+        WebInputEvent::PlaceShip {
+            ship_index,
+            row,
+            col,
+            orientation,
+        } => {
+            if ship_index >= NUM_SHIPS {
+                return Err(WebInputError::ShipIndexOutOfBounds { ship_index });
+            }
+            if row >= BOARD_SIZE as usize || col >= BOARD_SIZE as usize {
+                return Err(WebInputError::PlacementOutOfBounds { row, col });
+            }
+            Ok(UiEvent::PlaceShip {
+                ship_index,
+                row,
+                col,
+                orientation: Orientation::from(orientation),
+            })
         }
     }
 }
@@ -180,6 +222,7 @@ pub struct WebMenuView {
     pub title: String,
     pub items: Vec<String>,
     pub selected: usize,
+    pub notice: Option<String>,
 }
 
 impl From<&MenuView<'_>> for WebMenuView {
@@ -188,6 +231,7 @@ impl From<&MenuView<'_>> for WebMenuView {
             title: view.title.to_string(),
             items: view.items.iter().map(|item| item.to_string()).collect(),
             selected: view.selected,
+            notice: view.notice.map(ToString::to_string),
         }
     }
 }
@@ -445,6 +489,15 @@ impl From<Orientation> for WebOrientation {
         match orientation {
             Orientation::Horizontal => Self::Horizontal,
             Orientation::Vertical => Self::Vertical,
+        }
+    }
+}
+
+impl From<WebOrientation> for Orientation {
+    fn from(orientation: WebOrientation) -> Self {
+        match orientation {
+            WebOrientation::Horizontal => Self::Horizontal,
+            WebOrientation::Vertical => Self::Vertical,
         }
     }
 }

@@ -2,8 +2,8 @@
 
 use std::io::{self, Write};
 
-use crate::agent::Coordinate;
-use crate::engine::{Board, GuessBoard, GuessResult, BOARD_SIZE};
+use crate::agent::{Coordinate, ShipPlacement};
+use crate::engine::{Board, GuessBoard, GuessResult, Orientation, BOARD_SIZE};
 use crate::input::{InputSource, UiEvent};
 use crate::render::{GameEventView, Renderer, ScreenView};
 
@@ -20,7 +20,7 @@ impl CliInput {
         format!("{}{}", col_char, row + 1)
     }
 
-    fn parse_coord(input: &str) -> Option<Coordinate> {
+    pub fn parse_coord(input: &str) -> Option<Coordinate> {
         let trimmed = input.trim();
         let bytes = trimmed.as_bytes();
         if bytes.len() < 2 {
@@ -36,6 +36,29 @@ impl CliInput {
             return None;
         }
         Some((row - 1, col))
+    }
+
+    pub fn parse_orientation(input: &str) -> Option<Orientation> {
+        match input.trim().to_ascii_uppercase().as_str() {
+            "H" | "HOR" | "HORIZONTAL" => Some(Orientation::Horizontal),
+            "V" | "VER" | "VERTICAL" => Some(Orientation::Vertical),
+            _ => None,
+        }
+    }
+
+    pub fn parse_placement(input: &str, ship_index: usize) -> Option<ShipPlacement> {
+        let mut parts = input.split_whitespace();
+        let (row, col) = Self::parse_coord(parts.next()?)?;
+        let orientation = Self::parse_orientation(parts.next()?)?;
+        if parts.next().is_some() {
+            return None;
+        }
+        Some(ShipPlacement {
+            ship_index,
+            row,
+            col,
+            orientation,
+        })
     }
 }
 
@@ -59,14 +82,7 @@ impl InputSource for CliInput {
             return Ok(None);
         }
 
-        Self::parse_coord(trimmed)
-            .map(|coord| Some(UiEvent::Target(coord)))
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("invalid coordinate: {}", trimmed),
-                )
-            })
+        Ok(Self::parse_coord(trimmed).map(UiEvent::Target))
     }
 }
 
@@ -102,6 +118,10 @@ impl CliRenderer {
             }
             println!();
         }
+    }
+
+    pub fn render_board_preview(board: &Board) {
+        Self::print_board(board, true);
     }
 
     fn print_guess_board(guess_board: &GuessBoard) {
@@ -189,6 +209,9 @@ impl Renderer for CliRenderer {
             ScreenView::Title => println!("Battleship"),
             ScreenView::Menu(menu) => {
                 println!("{}", menu.title);
+                if let Some(notice) = menu.notice {
+                    println!("{}", notice);
+                }
                 for (idx, item) in menu.items.iter().enumerate() {
                     println!("{} {}", if idx == menu.selected { ">" } else { " " }, item);
                 }
@@ -209,5 +232,43 @@ impl Renderer for CliRenderer {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_coordinates_case_insensitively() {
+        assert_eq!(CliInput::parse_coord("A1"), Some((0, 0)));
+        assert_eq!(CliInput::parse_coord("j10"), Some((9, 9)));
+        assert_eq!(CliInput::parse_coord("K1"), None);
+        assert_eq!(CliInput::parse_coord("A0"), None);
+        assert_eq!(CliInput::parse_coord("A11"), None);
+    }
+
+    #[test]
+    fn parses_ship_placement_with_orientation() {
+        assert_eq!(
+            CliInput::parse_placement("B3 V", 2),
+            Some(ShipPlacement {
+                ship_index: 2,
+                row: 2,
+                col: 1,
+                orientation: Orientation::Vertical,
+            })
+        );
+        assert_eq!(
+            CliInput::parse_placement("c4 horizontal", 1),
+            Some(ShipPlacement {
+                ship_index: 1,
+                row: 3,
+                col: 2,
+                orientation: Orientation::Horizontal,
+            })
+        );
+        assert_eq!(CliInput::parse_placement("C4", 1), None);
+        assert_eq!(CliInput::parse_placement("C4 X", 1), None);
     }
 }

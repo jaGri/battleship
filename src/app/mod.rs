@@ -7,7 +7,9 @@ use std::vec::Vec;
 
 use rand::rngs::SmallRng;
 
-use crate::agent::{AgentAction, AgentRequest, GameEvent, PlayerAgent, ShipPlacement};
+use crate::agent::{
+    AgentAction, AgentRequest, AiDifficulty, GameEvent, PlayerAgent, ShipPlacement,
+};
 use crate::engine::{
     BoardError, GameEngine, GameState, GameStatus, GuessBoard, GuessBoardState, GuessResult, SHIPS,
 };
@@ -16,7 +18,24 @@ use crate::protocol::domain::{RemotePlayer, RemoteSyncPayload};
 use crate::protocol::{WireMessage, PROTOCOL_VERSION};
 use crate::render::{ConnectionView, GameEventView, GameView, MenuView, MessageView, ScreenView};
 
-const MAIN_MENU_ITEMS: [&str; 3] = ["Solo Game", "Remote Game", "Exit"];
+const MAIN_MENU_ITEMS: [&str; 6] = [
+    "New Solo Game",
+    "Resume Game",
+    "Remote Host",
+    "Remote Join",
+    "Difficulty",
+    "Quit",
+];
+const SOLO_SETUP_ITEMS: [&str; 3] = ["Random placement", "Manual placement", "Back"];
+const DIFFICULTY_ITEMS: [&str; 5] = ["Easy", "Medium", "Hard", "Expert", "Back"];
+
+/// Ship setup mode requested from an agent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlacementMode {
+    Prompt,
+    Random,
+    Manual,
+}
 
 /// Snapshot saved by app runners.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +53,7 @@ pub enum AppState {
     Title,
     MainMenu,
     SoloSetup,
+    DifficultyMenu,
     Pairing,
     Playing,
     ConnectionOverlay,
@@ -132,7 +152,7 @@ pub enum MatchMode {
 /// Agent work kind a runner may need to schedule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentPromptKind {
-    PlaceShips,
+    PlaceShips(PlacementMode),
     SelectTarget,
     Observe(GameEvent),
 }
@@ -168,6 +188,7 @@ pub enum AppCommand {
     Send(WireMessage),
     Save(SavedGame),
     ClearSave,
+    ConfigureDifficulty(AiDifficulty),
     RequestAgent(AgentPrompt),
     Exit,
 }
@@ -232,6 +253,7 @@ pub struct BattleshipApp<A, O> {
     pub match_mode: MatchMode,
     pub pending_prompt: Option<AgentPrompt>,
     pub last_notice: Option<&'static str>,
+    pub ai_difficulty: AiDifficulty,
     local_ships_placed: bool,
     opponent_ships_placed: bool,
 }
@@ -247,6 +269,7 @@ impl<A, O> BattleshipApp<A, O> {
             match_mode: MatchMode::Solo,
             pending_prompt: None,
             last_notice: None,
+            ai_difficulty: AiDifficulty::Hard,
             local_ships_placed: false,
             opponent_ships_placed: false,
         }
@@ -259,10 +282,19 @@ impl<A, O> BattleshipApp<A, O> {
                 title: "Battleship",
                 items: &MAIN_MENU_ITEMS,
                 selected: self.selected_menu_item,
+                notice: self.last_notice,
             }),
-            AppState::SoloSetup => ScreenView::Message(MessageView {
+            AppState::SoloSetup => ScreenView::Menu(MenuView {
                 title: "Solo Setup",
-                body: self.last_notice.unwrap_or("Preparing ships."),
+                items: &SOLO_SETUP_ITEMS,
+                selected: self.selected_menu_item,
+                notice: self.last_notice,
+            }),
+            AppState::DifficultyMenu => ScreenView::Menu(MenuView {
+                title: "Difficulty",
+                items: &DIFFICULTY_ITEMS,
+                selected: self.selected_menu_item,
+                notice: Some(difficulty_notice(self.ai_difficulty)),
             }),
             AppState::Pairing => ScreenView::Pairing(ConnectionView {
                 code: None,
@@ -335,6 +367,8 @@ impl<A, O> BattleshipApp<A, O> {
                 _ => vec![AppCommand::Render],
             },
             AppState::MainMenu => self.handle_menu_ui(event),
+            AppState::SoloSetup => self.handle_solo_setup_ui(event),
+            AppState::DifficultyMenu => self.handle_difficulty_ui(event),
             AppState::ConnectionOverlay => match event {
                 UiEvent::Confirm | UiEvent::Start => self.request_remote_resume(),
                 UiEvent::Back => {
@@ -371,10 +405,93 @@ impl<A, O> BattleshipApp<A, O> {
             }
             UiEvent::Confirm | UiEvent::Start => match self.selected_menu_item {
                 0 => self.start_solo_setup(),
-                1 => self.start_remote_pairing(RemoteRole::Host),
+                1 => {
+                    self.last_notice = Some("Resume is not wired yet.");
+                    vec![AppCommand::Render]
+                }
+                2 => self.start_remote_pairing(RemoteRole::Host),
+                3 => self.start_remote_pairing(RemoteRole::Guest),
+                4 => self.start_difficulty_menu(),
                 _ => vec![AppCommand::Render, AppCommand::Exit],
             },
             UiEvent::Back => vec![AppCommand::Render, AppCommand::Exit],
+            _ => vec![AppCommand::Render],
+        }
+    }
+
+    fn handle_solo_setup_ui(&mut self, event: UiEvent) -> Vec<AppCommand> {
+        match event {
+            UiEvent::Up => {
+                self.selected_menu_item = if self.selected_menu_item == 0 {
+                    SOLO_SETUP_ITEMS.len() - 1
+                } else {
+                    self.selected_menu_item - 1
+                };
+                vec![AppCommand::Render]
+            }
+            UiEvent::Down => {
+                self.selected_menu_item = (self.selected_menu_item + 1) % SOLO_SETUP_ITEMS.len();
+                vec![AppCommand::Render]
+            }
+            UiEvent::Confirm | UiEvent::Start => match self.selected_menu_item {
+                0 => self.request_place(PlayerSide::Local, PlacementMode::Random),
+                1 => self.request_place(PlayerSide::Local, PlacementMode::Manual),
+                _ => {
+                    self.state = AppState::MainMenu;
+                    self.selected_menu_item = 0;
+                    vec![AppCommand::Render]
+                }
+            },
+            UiEvent::Back => {
+                self.state = AppState::MainMenu;
+                self.selected_menu_item = 0;
+                vec![AppCommand::Render]
+            }
+            _ => vec![AppCommand::Render],
+        }
+    }
+
+    fn start_difficulty_menu(&mut self) -> Vec<AppCommand> {
+        self.state = AppState::DifficultyMenu;
+        self.selected_menu_item = difficulty_index(self.ai_difficulty);
+        vec![AppCommand::Render]
+    }
+
+    fn handle_difficulty_ui(&mut self, event: UiEvent) -> Vec<AppCommand> {
+        match event {
+            UiEvent::Up => {
+                self.selected_menu_item = if self.selected_menu_item == 0 {
+                    DIFFICULTY_ITEMS.len() - 1
+                } else {
+                    self.selected_menu_item - 1
+                };
+                vec![AppCommand::Render]
+            }
+            UiEvent::Down => {
+                self.selected_menu_item = (self.selected_menu_item + 1) % DIFFICULTY_ITEMS.len();
+                vec![AppCommand::Render]
+            }
+            UiEvent::Confirm | UiEvent::Start => {
+                if let Some(difficulty) = difficulty_from_index(self.selected_menu_item) {
+                    self.ai_difficulty = difficulty;
+                    self.state = AppState::MainMenu;
+                    self.selected_menu_item = 4;
+                    self.last_notice = Some("Difficulty updated.");
+                    vec![
+                        AppCommand::ConfigureDifficulty(difficulty),
+                        AppCommand::Render,
+                    ]
+                } else {
+                    self.state = AppState::MainMenu;
+                    self.selected_menu_item = 4;
+                    vec![AppCommand::Render]
+                }
+            }
+            UiEvent::Back => {
+                self.state = AppState::MainMenu;
+                self.selected_menu_item = 4;
+                vec![AppCommand::Render]
+            }
             _ => vec![AppCommand::Render],
         }
     }
@@ -391,10 +508,10 @@ impl<A, O> BattleshipApp<A, O> {
         }
 
         match (self.state, prompt.kind) {
-            (AppState::SoloSetup, AgentPromptKind::PlaceShips) => {
+            (AppState::SoloSetup, AgentPromptKind::PlaceShips(_)) => {
                 self.handle_setup_placement(side, action)
             }
-            (AppState::Pairing, AgentPromptKind::PlaceShips) => {
+            (AppState::Pairing, AgentPromptKind::PlaceShips(_)) => {
                 self.handle_remote_placement(side, action)
             }
             (AppState::Playing, AgentPromptKind::SelectTarget) => {
@@ -450,9 +567,6 @@ impl<A, O> BattleshipApp<A, O> {
 
     fn handle_tick(&mut self) -> Vec<AppCommand> {
         match self.state {
-            AppState::SoloSetup if self.pending_prompt.is_none() => {
-                self.request_place(PlayerSide::Local)
-            }
             AppState::Playing if self.pending_prompt.is_none() => self.request_current_turn_agent(),
             _ => vec![AppCommand::Render],
         }
@@ -480,7 +594,8 @@ impl<A, O> BattleshipApp<A, O> {
         self.local_ships_placed = false;
         self.opponent_ships_placed = false;
         self.pending_prompt = None;
-        self.request_place(PlayerSide::Local)
+        self.selected_menu_item = 0;
+        vec![AppCommand::Render]
     }
 
     fn start_remote_pairing(&mut self, role: RemoteRole) -> Vec<AppCommand> {
@@ -501,15 +616,15 @@ impl<A, O> BattleshipApp<A, O> {
         commands
     }
 
-    fn request_place(&mut self, side: PlayerSide) -> Vec<AppCommand> {
+    fn request_place(&mut self, side: PlayerSide, mode: PlacementMode) -> Vec<AppCommand> {
         self.pending_prompt = Some(AgentPrompt {
             side,
-            kind: AgentPromptKind::PlaceShips,
+            kind: AgentPromptKind::PlaceShips(mode),
         });
         vec![
             AppCommand::RequestAgent(AgentPrompt {
                 side,
-                kind: AgentPromptKind::PlaceShips,
+                kind: AgentPromptKind::PlaceShips(mode),
             }),
             AppCommand::Render,
         ]
@@ -553,7 +668,7 @@ impl<A, O> BattleshipApp<A, O> {
         match side {
             PlayerSide::Local => {
                 self.local_ships_placed = true;
-                self.request_place(PlayerSide::Opponent)
+                self.request_place(PlayerSide::Opponent, PlacementMode::Random)
             }
             PlayerSide::Opponent => {
                 self.opponent_ships_placed = true;
@@ -634,7 +749,7 @@ impl<A, O> BattleshipApp<A, O> {
             version: PROTOCOL_VERSION,
         })];
         if !self.local_ships_placed {
-            commands.extend(self.request_place(PlayerSide::Local));
+            commands.extend(self.request_place(PlayerSide::Local, PlacementMode::Random));
         } else {
             commands.push(AppCommand::Render);
         }
@@ -652,7 +767,7 @@ impl<A, O> BattleshipApp<A, O> {
             self.state = AppState::Pairing;
         }
         if !self.local_ships_placed {
-            self.request_place(PlayerSide::Local)
+            self.request_place(PlayerSide::Local, PlacementMode::Random)
         } else {
             vec![AppCommand::Render]
         }
@@ -1210,5 +1325,33 @@ fn core_guess_result(res: crate::protocol::domain::GuessResult) -> Result<GuessR
             .find(|ship| ship.name() == name)
             .map(|ship| GuessResult::Sink(ship.name()))
             .ok_or(BoardError::NameNotFound),
+    }
+}
+
+fn difficulty_index(difficulty: AiDifficulty) -> usize {
+    match difficulty {
+        AiDifficulty::Easy => 0,
+        AiDifficulty::Medium => 1,
+        AiDifficulty::Hard => 2,
+        AiDifficulty::Expert => 3,
+    }
+}
+
+fn difficulty_from_index(index: usize) -> Option<AiDifficulty> {
+    match index {
+        0 => Some(AiDifficulty::Easy),
+        1 => Some(AiDifficulty::Medium),
+        2 => Some(AiDifficulty::Hard),
+        3 => Some(AiDifficulty::Expert),
+        _ => None,
+    }
+}
+
+fn difficulty_notice(difficulty: AiDifficulty) -> &'static str {
+    match difficulty {
+        AiDifficulty::Easy => "Current: Easy",
+        AiDifficulty::Medium => "Current: Medium",
+        AiDifficulty::Hard => "Current: Hard",
+        AiDifficulty::Expert => "Current: Expert",
     }
 }

@@ -31,7 +31,7 @@ pub use agent::{
 };
 pub use app::{
     AgentPrompt, AgentPromptKind, AppCommand, AppEvent, AppState, BattleshipApp, ConnectionStatus,
-    MatchMode, MatchState, PlayerSide, RemoteRole, RemoteSession, SavedGame,
+    MatchMode, MatchState, PlacementMode, PlayerSide, RemoteRole, RemoteSession, SavedGame,
 };
 pub use input::{InputSource, UiEvent};
 #[cfg(feature = "persistence")]

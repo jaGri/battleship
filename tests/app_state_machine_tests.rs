@@ -2,9 +2,9 @@
 
 use battleship::domain::RemotePlayer;
 use battleship::{
-    AgentAction, AgentPromptKind, AppCommand, AppEvent, AppState, BattleshipApp, BitBoard,
-    ConnectionStatus, GuessBoardState, MatchMode, Orientation, PlayerSide, RemoteRole,
-    ScriptedAgent, ShipPlacement, UiEvent, WireMessage, PROTOCOL_VERSION,
+    AgentAction, AgentPromptKind, AiDifficulty, AppCommand, AppEvent, AppState, BattleshipApp,
+    BitBoard, ConnectionStatus, GuessBoardState, MatchMode, Orientation, PlacementMode, PlayerSide,
+    RemoteRole, ScriptedAgent, ShipPlacement, UiEvent, WireMessage, PROTOCOL_VERSION,
 };
 
 fn placements() -> AgentAction {
@@ -48,6 +48,7 @@ fn new_app() -> BattleshipApp<ScriptedAgent, ScriptedAgent> {
 
 fn setup_solo(app: &mut BattleshipApp<ScriptedAgent, ScriptedAgent>) -> Vec<AppCommand> {
     app.update(AppEvent::Ui(UiEvent::Start));
+    app.update(AppEvent::Ui(UiEvent::Confirm));
     let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
     assert!(matches!(
         commands.as_slice(),
@@ -73,12 +74,67 @@ fn title_menu_and_solo_setup_request_placements() {
 
     let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
     assert_eq!(app.state, AppState::SoloSetup);
+    assert_eq!(commands, vec![AppCommand::Render]);
+
+    let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
     assert!(matches!(
         commands.as_slice(),
         [AppCommand::RequestAgent(prompt), AppCommand::Render]
             if prompt.side == PlayerSide::Local
-                && prompt.kind == AgentPromptKind::PlaceShips
+                && prompt.kind == AgentPromptKind::PlaceShips(PlacementMode::Random)
     ));
+}
+
+#[test]
+fn solo_setup_manual_selection_requests_manual_placement() {
+    let mut app = new_app();
+    app.update(AppEvent::Ui(UiEvent::Start));
+    app.update(AppEvent::Ui(UiEvent::Confirm));
+    app.update(AppEvent::Ui(UiEvent::Down));
+    let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
+
+    assert!(matches!(
+        commands.as_slice(),
+        [AppCommand::RequestAgent(prompt), AppCommand::Render]
+            if prompt.side == PlayerSide::Local
+                && prompt.kind == AgentPromptKind::PlaceShips(PlacementMode::Manual)
+    ));
+}
+
+#[test]
+fn resume_placeholder_renders_notice_without_leaving_menu() {
+    let mut app = new_app();
+    app.update(AppEvent::Ui(UiEvent::Start));
+    app.update(AppEvent::Ui(UiEvent::Down));
+    let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
+
+    assert_eq!(app.state, AppState::MainMenu);
+    assert_eq!(commands, vec![AppCommand::Render]);
+    assert_eq!(app.last_notice, Some("Resume is not wired yet."));
+}
+
+#[test]
+fn difficulty_menu_emits_configuration_command() {
+    let mut app = new_app();
+    app.update(AppEvent::Ui(UiEvent::Start));
+    for _ in 0..4 {
+        app.update(AppEvent::Ui(UiEvent::Down));
+    }
+    app.update(AppEvent::Ui(UiEvent::Confirm));
+    assert_eq!(app.state, AppState::DifficultyMenu);
+
+    app.update(AppEvent::Ui(UiEvent::Up));
+    let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
+
+    assert_eq!(app.state, AppState::MainMenu);
+    assert_eq!(app.ai_difficulty, AiDifficulty::Medium);
+    assert_eq!(
+        commands,
+        vec![
+            AppCommand::ConfigureDifficulty(AiDifficulty::Medium),
+            AppCommand::Render,
+        ]
+    );
 }
 
 #[test]
@@ -152,6 +208,7 @@ fn remote_pairing_handshake_and_ready_enter_playing() {
     let mut app = new_app();
     app.update(AppEvent::Ui(UiEvent::Start));
     app.update(AppEvent::Ui(UiEvent::Down));
+    app.update(AppEvent::Ui(UiEvent::Down));
     let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
 
     assert_eq!(app.state, AppState::Pairing);
@@ -169,7 +226,7 @@ fn remote_pairing_handshake_and_ready_enter_playing() {
         cmd,
         AppCommand::RequestAgent(prompt)
             if prompt.side == PlayerSide::Local
-                && prompt.kind == AgentPromptKind::PlaceShips
+                && prompt.kind == AgentPromptKind::PlaceShips(PlacementMode::Random)
     )));
 
     let commands = app.update(AppEvent::Agent {
