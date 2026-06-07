@@ -1,10 +1,11 @@
 #![cfg(feature = "std")]
 
-use battleship::domain::RemotePlayer;
+use battleship::domain::{GuessResult as WireGuessResult, RemotePlayer};
 use battleship::{
     AgentAction, AgentPromptKind, AiDifficulty, AppCommand, AppEvent, AppState, BattleshipApp,
     BitBoard, ConnectionStatus, GuessBoardState, MatchMode, Orientation, PlacementMode, PlayerSide,
-    RemoteRole, SavedGame, ScriptedAgent, ShipPlacement, UiEvent, WireMessage, PROTOCOL_VERSION,
+    RemoteRole, SavedGame, ScriptedAgent, Ship, ShipPlacement, UiEvent, WireMessage,
+    PROTOCOL_VERSION, SHIPS,
 };
 
 fn placements() -> AgentAction {
@@ -44,6 +45,10 @@ fn placements() -> AgentAction {
 
 fn new_app() -> BattleshipApp<ScriptedAgent, ScriptedAgent> {
     BattleshipApp::new_local_ai(ScriptedAgent::default(), ScriptedAgent::default())
+}
+
+fn empty_ships() -> [Ship<u128, 10>; 5] {
+    core::array::from_fn(|i| Ship::unknown(SHIPS[i]))
 }
 
 fn setup_solo(app: &mut BattleshipApp<ScriptedAgent, ScriptedAgent>) -> Vec<AppCommand> {
@@ -440,6 +445,7 @@ fn private_sync_round_trips_without_board_state() {
         public_shots: GuessBoardState {
             hits: BitBoard::<u128, 10>::new(),
             misses: BitBoard::<u128, 10>::new(),
+            ships: empty_ships(),
         },
         enemy_ships_remaining: [true; 5],
         enemy_remaining: 17,
@@ -464,6 +470,135 @@ fn private_sync_round_trips_without_board_state() {
             ..
         }
     ));
+}
+
+#[test]
+fn remote_status_response_includes_sunk_footprint() {
+    let mut app = new_app();
+    app.update(AppEvent::Transport(WireMessage::Handshake {
+        version: PROTOCOL_VERSION,
+    }));
+    app.update(AppEvent::Agent {
+        side: PlayerSide::Local,
+        action: placements(),
+    });
+    app.update(AppEvent::Transport(WireMessage::Ready {
+        version: PROTOCOL_VERSION,
+        seq: 1,
+    }));
+
+    app.update(AppEvent::Transport(WireMessage::Guess {
+        version: PROTOCOL_VERSION,
+        seq: 1,
+        x: 4,
+        y: 0,
+    }));
+    let commands = app.update(AppEvent::Transport(WireMessage::Guess {
+        version: PROTOCOL_VERSION,
+        seq: 2,
+        x: 4,
+        y: 1,
+    }));
+
+    let response = commands
+        .iter()
+        .find_map(|cmd| match cmd {
+            AppCommand::Send(WireMessage::StatusResp { res, .. }) => Some(res),
+            _ => None,
+        })
+        .expect("status response");
+    let WireGuessResult::Sink { ship, footprint } = response else {
+        panic!("expected sink response");
+    };
+    assert_eq!(ship, "Destroyer");
+    assert_eq!(footprint.count_ones(), 2);
+    assert!(footprint.get(4, 0).unwrap());
+    assert!(footprint.get(4, 1).unwrap());
+}
+
+#[test]
+fn remote_sink_response_updates_active_hits() {
+    let mut app = new_app();
+    app.match_mode = MatchMode::Remote(battleship::RemoteSession {
+        role: RemoteRole::Host,
+        status: ConnectionStatus::Connected,
+        next_seq: 2,
+        last_received_seq: None,
+        local_ready: true,
+        peer_ready: true,
+        awaiting_status_seq: Some(7),
+        pending_target: Some((4, 1)),
+        cached_response: None,
+    });
+    app.state = AppState::Playing;
+    app.match_state
+        .local_engine
+        .record_guess(4, 0, battleship::GuessResult::Hit)
+        .unwrap();
+
+    let mut footprint = BitBoard::<u128, 10>::new();
+    footprint.set(4, 0).unwrap();
+    footprint.set(4, 1).unwrap();
+    app.update(AppEvent::Transport(WireMessage::StatusResp {
+        version: PROTOCOL_VERSION,
+        seq: 7,
+        res: WireGuessResult::Sink {
+            ship: "Destroyer".to_string(),
+            footprint,
+        },
+    }));
+
+    assert!(!app
+        .match_state
+        .local_engine
+        .active_hits()
+        .get(4, 0)
+        .unwrap());
+    assert!(!app
+        .match_state
+        .local_engine
+        .active_hits()
+        .get(4, 1)
+        .unwrap());
+}
+
+#[test]
+fn malformed_remote_sink_footprint_enters_out_of_sync() {
+    let mut app = new_app();
+    app.match_mode = MatchMode::Remote(battleship::RemoteSession {
+        role: RemoteRole::Host,
+        status: ConnectionStatus::Connected,
+        next_seq: 2,
+        last_received_seq: None,
+        local_ready: true,
+        peer_ready: true,
+        awaiting_status_seq: Some(7),
+        pending_target: Some((4, 1)),
+        cached_response: None,
+    });
+    app.state = AppState::Playing;
+    app.match_state
+        .local_engine
+        .record_guess(4, 0, battleship::GuessResult::Hit)
+        .unwrap();
+
+    let mut footprint = BitBoard::<u128, 10>::new();
+    footprint.set(4, 1).unwrap();
+    let commands = app.update(AppEvent::Transport(WireMessage::StatusResp {
+        version: PROTOCOL_VERSION,
+        seq: 7,
+        res: WireGuessResult::Sink {
+            ship: "Destroyer".to_string(),
+            footprint,
+        },
+    }));
+
+    assert_eq!(app.state, AppState::ConnectionOverlay);
+    assert!(matches!(
+        app.match_mode,
+        MatchMode::Remote(ref session) if session.status == ConnectionStatus::OutOfSync
+    ));
+    assert_eq!(commands, vec![AppCommand::Render]);
 }
 
 #[test]

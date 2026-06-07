@@ -1,5 +1,5 @@
-use battleship::{Board, BoardError, GuessResult, Orientation, BOARD_SIZE, NUM_SHIPS, SHIPS};
-use battleship::{BoardState, Ship};
+use battleship::BoardState;
+use battleship::{Board, BoardError, GuessResult, Orientation, NUM_SHIPS, SHIPS};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -72,14 +72,13 @@ fn test_board_state_roundtrip() {
 }
 
 #[test]
-fn test_ship_state_conversion() {
+fn test_ship_state_uses_unified_ship() {
     let mut board = Board::new();
     board.place(2, 4, 1, Orientation::Horizontal).unwrap();
     let states = board.ship_states();
-    let def = SHIPS[2];
-    let ship = Ship::<u128, { BOARD_SIZE as usize }>::from_state(&states[2], def)
-        .unwrap()
-        .unwrap();
+    let ship = states[2];
     assert_eq!(ship.origin(), (4, 1));
     assert_eq!(ship.orientation(), Orientation::Horizontal);
+    assert_eq!(ship.length, SHIPS[2].length());
+    assert_eq!(ship.placement.count_ones(), SHIPS[2].length());
 }

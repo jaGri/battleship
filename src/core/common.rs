@@ -30,6 +30,8 @@ pub enum BoardError {
     AlreadyGuessed,
     /// Unable to place ship (random or manual placement failed).
     UnableToPlaceShip,
+    /// Sunk ship footprint does not match public guess knowledge.
+    InvalidSunkShipFootprint,
     // Ship out of bounds
     ShipOutOfBounds,
     /// Unknown ship hit (should not happen if all ships are placed correctly).
@@ -51,6 +53,9 @@ impl core::fmt::Display for BoardError {
             BoardError::ShipOverlaps => write!(f, "Ship placement overlaps with another ship"),
             BoardError::AlreadyGuessed => write!(f, "Guess was already made at this position"),
             BoardError::UnableToPlaceShip => write!(f, "Unable to place ship"),
+            BoardError::InvalidSunkShipFootprint => {
+                write!(f, "Sunk ship footprint is invalid")
+            }
             BoardError::ShipOutOfBounds => write!(f, "Ship placement is out of bounds"),
             BoardError::UnknownShipHit => write!(f, "Hit on an unknown ship segment"),
         }

@@ -9,7 +9,7 @@ pub mod domain;
 use domain::*;
 
 /// Current protocol version.
-pub const PROTOCOL_VERSION: u8 = 1;
+pub const PROTOCOL_VERSION: u8 = 2;
 
 #[cfg(feature = "std")]
 pub use async_trait;

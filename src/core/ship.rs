@@ -14,54 +14,6 @@ pub enum Orientation {
     Vertical,
 }
 
-/// Public state of a ship on the board used for serialization or UI.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
-pub struct ShipState {
-    #[cfg_attr(feature = "std", serde(skip))]
-    pub name: &'static str,
-    pub sunk: bool,
-    pub position: Option<(usize, usize, Orientation)>,
-}
-
-impl ShipState {
-    /// Create initial state for a ship.
-    pub const fn new(name: &'static str) -> Self {
-        ShipState {
-            name,
-            sunk: false,
-            position: None,
-        }
-    }
-}
-
-impl<T, const N: usize> From<&Ship<T, N>> for ShipState
-where
-    T: PrimInt + Unsigned + Zero,
-{
-    fn from(ship: &Ship<T, N>) -> Self {
-        ShipState {
-            name: ship.ship_type().name(),
-            sunk: ship.is_sunk(),
-            position: Some((ship.row, ship.col, ship.orientation)),
-        }
-    }
-}
-
-impl<T, const N: usize> Ship<T, N>
-where
-    T: PrimInt + Unsigned + Zero,
-{
-    /// Construct a ship from a [`ShipState`] if placement information is present.
-    pub fn from_state(state: &ShipState, def: ShipDef) -> Result<Option<Self>, BoardError> {
-        if let Some((row, col, orient)) = state.position {
-            Ok(Some(Ship::new(def, orient, row, col)?))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
 /// Definition of a ship: name and length.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShipDef {
@@ -86,26 +38,39 @@ impl ShipDef {
     }
 }
 
-/// A ship placed on an N×N board, with hits tracked in a `BitBoard`.
+/// Shared ship state for owned ships and revealed enemy ships.
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ship<T, const N: usize>
 where
     T: PrimInt + Unsigned + Zero,
 {
-    ship_type: ShipDef,
-    orientation: Orientation,
-    row: usize,
-    col: usize,
-    mask: BitBoard<T, N>,
-    hits: BitBoard<T, N>,
+    #[cfg_attr(feature = "std", serde(skip))]
+    pub name: &'static str,
+    pub length: usize,
+    pub sunk: bool,
+    pub hits: BitBoard<T, N>,
+    pub placement: BitBoard<T, N>,
+    pub position: Option<(usize, usize, Orientation)>,
 }
 
 impl<T, const N: usize> Ship<T, N>
 where
     T: PrimInt + Unsigned + Zero,
 {
+    /// Create an unknown or unplaced ship slot.
+    pub fn unknown(ship_type: ShipDef) -> Self {
+        Self {
+            name: ship_type.name(),
+            length: ship_type.length(),
+            sunk: false,
+            hits: BitBoard::<T, N>::new(),
+            placement: BitBoard::<T, N>::new(),
+            position: None,
+        }
+    }
+
     /// Place a ship at (`row`, `col`) with `orientation`.
-    /// Returns the newly constructed ship.
     pub fn new(
         ship_type: ShipDef,
         orientation: Orientation,
@@ -113,7 +78,6 @@ where
         col: usize,
     ) -> Result<Self, BoardError> {
         let len = ship_type.length();
-        // Ensure placement fits within N×N
         if orientation == Orientation::Horizontal {
             if col + len > N {
                 return Err(BoardError::ShipOutOfBounds);
@@ -122,62 +86,102 @@ where
             return Err(BoardError::ShipOutOfBounds);
         }
 
-        // Build occupancy mask
-        let mut mask = BitBoard::<T, N>::new();
+        let mut placement = BitBoard::<T, N>::new();
         for i in 0..len {
             let (r, c) = match orientation {
                 Orientation::Horizontal => (row, col + i),
                 Orientation::Vertical => (row + i, col),
             };
-            mask.set(r, c)?;
+            placement.set(r, c)?;
         }
 
-        // Initialize empty hits board
-        let hits = BitBoard::<T, N>::new();
-        Ok(Ship {
-            ship_type,
-            orientation,
-            row,
-            col,
-            mask,
-            hits,
+        Ok(Self {
+            name: ship_type.name(),
+            length: ship_type.length(),
+            sunk: false,
+            hits: BitBoard::<T, N>::new(),
+            placement,
+            position: Some((row, col, orientation)),
         })
     }
 
-    /// Register a hit at (`row`, `col`) using an occupancy mask.
-    /// Returns `true` if it was a hit and records it.
-    pub fn guess(&mut self, row: usize, col: usize) -> bool {
-        if self.mask.get(row, col).unwrap_or(false) {
+    /// Restore the canonical static definition after deserialization.
+    pub fn with_definition(mut self, ship_type: ShipDef) -> Self {
+        self.name = ship_type.name();
+        self.length = ship_type.length();
+        self
+    }
+
+    /// Returns true when this ship has a known placement.
+    pub fn is_placed(&self) -> bool {
+        self.position.is_some() && !self.placement.is_empty()
+    }
+
+    /// Returns true when the known placement covers (`row`, `col`).
+    pub fn covers(&self, row: usize, col: usize) -> bool {
+        self.placement.get(row, col).unwrap_or(false)
+    }
+
+    /// Register a hit at (`row`, `col`).
+    pub fn record_hit(&mut self, row: usize, col: usize) -> bool {
+        if self.covers(row, col) {
             let _ = self.hits.set(row, col);
+            self.sunk = self.hits.count_ones() == self.length;
             true
         } else {
             false
         }
     }
 
-    /// Check if the ship is sunk (all segments hit).
+    /// Backward-friendly alias for recording a hit on a placed ship.
+    pub fn guess(&mut self, row: usize, col: usize) -> bool {
+        self.record_hit(row, col)
+    }
+
+    /// Check if the ship is sunk.
     pub fn is_sunk(&self) -> bool {
-        self.hits.count_ones() == self.ship_type.length()
+        self.sunk
     }
 
     /// Ship's type.
     pub fn ship_type(&self) -> ShipDef {
-        self.ship_type
+        ShipDef::new(self.name, self.length)
     }
 
-    /// Origin of the ship (row, col).
+    /// Origin of the ship (row, col), or `(0, 0)` when unknown.
     pub fn origin(&self) -> (usize, usize) {
-        (self.row, self.col)
+        self.position
+            .map(|(row, col, _)| (row, col))
+            .unwrap_or((0, 0))
     }
 
-    /// Orientation of the ship.
+    /// Orientation of the ship, or horizontal when unknown.
     pub fn orientation(&self) -> Orientation {
-        self.orientation
+        self.position
+            .map(|(_, _, orientation)| orientation)
+            .unwrap_or(Orientation::Horizontal)
     }
 
-    /// Occupancy mask of the ship on the board.
+    /// Occupancy mask of known ship cells.
     pub fn mask(&self) -> BitBoard<T, N> {
-        self.mask
+        self.placement
+    }
+
+    /// Ship length if still afloat, otherwise zero.
+    pub fn remaining_length(&self) -> usize {
+        if self.sunk {
+            0
+        } else {
+            self.length
+        }
+    }
+
+    /// Reveal this ship as sunk with a known footprint.
+    pub fn reveal_sunk(&mut self, footprint: BitBoard<T, N>) {
+        self.placement = footprint;
+        self.hits = footprint;
+        self.sunk = true;
+        self.position = None;
     }
 }
 
@@ -188,13 +192,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Ship {{ name: \"{}\", origin: ({}, {}), orientation: {:?}, hits: {}, mask: {:?} }}",
-            self.ship_type.name(),
-            self.row,
-            self.col,
-            self.orientation,
+            "Ship {{ name: \"{}\", length: {}, sunk: {}, position: {:?}, hits: {}, placement: {:?} }}",
+            self.name,
+            self.length,
+            self.sunk,
+            self.position,
             self.hits.count_ones(),
-            self.mask,
+            self.placement,
         )
     }
 }

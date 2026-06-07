@@ -3,6 +3,7 @@ use super::{
     board::{Board, BoardState},
     common::{BoardError, GuessResult},
     config::{BOARD_SIZE, NUM_SHIPS, SHIPS, TOTAL_SHIP_CELLS},
+    ship::Ship,
 };
 
 /// Bitboard type used for game state tracking.
@@ -14,6 +15,7 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 pub struct GuessBoardState {
     pub hits: BB,
     pub misses: BB,
+    pub ships: [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS],
 }
 
 /// Passive view of guesses made against an opponent.
@@ -88,7 +90,7 @@ pub struct GameEngine {
     guess_hits: BB,
     guess_misses: BB,
     enemy_remaining: usize,
-    enemy_ships_remaining: [bool; NUM_SHIPS],
+    enemy_ships: [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS],
 }
 
 impl Default for GameEngine {
@@ -105,7 +107,7 @@ impl GameEngine {
             guess_hits: BB::new(),
             guess_misses: BB::new(),
             enemy_remaining: TOTAL_SHIP_CELLS,
-            enemy_ships_remaining: [true; NUM_SHIPS],
+            enemy_ships: initial_enemy_ships(),
         }
     }
 
@@ -131,7 +133,12 @@ impl GameEngine {
 
     /// Bitboard of hits that are still relevant for targeting.
     pub fn active_hits(&self) -> BB {
-        self.guess_hits
+        self.guess_hits & !self.sunk_enemy_footprints()
+    }
+
+    /// Public state of enemy ships known to this engine.
+    pub fn enemy_ships(&self) -> [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS] {
+        self.enemy_ships
     }
 
     /// Handle an opponent guess on the player's board.
@@ -158,7 +165,7 @@ impl GameEngine {
                 self.guess_hits.set(row, col)?;
                 self.enemy_remaining = self.enemy_remaining.saturating_sub(1);
                 if let Some(idx) = SHIPS.iter().position(|s| s.name() == name) {
-                    self.enemy_ships_remaining[idx] = false;
+                    self.enemy_ships[idx].sunk = true;
                 } else {
                     return Err(BoardError::NameNotFound);
                 }
@@ -170,6 +177,41 @@ impl GameEngine {
         Ok(())
     }
 
+    /// Record a sink result with the fixed-size public footprint revealed by
+    /// the opponent.
+    pub fn record_sink_with_footprint(
+        &mut self,
+        row: usize,
+        col: usize,
+        ship_name: &'static str,
+        footprint: BB,
+    ) -> Result<(), BoardError> {
+        if self.guess_hits.get(row, col)? || self.guess_misses.get(row, col)? {
+            return Err(BoardError::AlreadyGuessed);
+        }
+        let idx = SHIPS
+            .iter()
+            .position(|s| s.name() == ship_name)
+            .ok_or(BoardError::NameNotFound)?;
+        if footprint.count_ones() != SHIPS[idx].length() || !footprint.get(row, col)? {
+            return Err(BoardError::InvalidSunkShipFootprint);
+        }
+        if !(footprint & self.guess_misses).is_empty() {
+            return Err(BoardError::InvalidSunkShipFootprint);
+        }
+
+        let mut public_hits = self.guess_hits;
+        public_hits.set(row, col)?;
+        if !(footprint & !public_hits).is_empty() {
+            return Err(BoardError::InvalidSunkShipFootprint);
+        }
+
+        self.guess_hits.set(row, col)?;
+        self.enemy_remaining = self.enemy_remaining.saturating_sub(1);
+        self.enemy_ships[idx].reveal_sunk(footprint);
+        Ok(())
+    }
+
     /// Generate a serializable snapshot of the current state.
     pub fn state(&self) -> GameState {
         GameState {
@@ -177,8 +219,9 @@ impl GameEngine {
             my_guesses: GuessBoardState {
                 hits: self.guess_hits,
                 misses: self.guess_misses,
+                ships: self.enemy_ships,
             },
-            enemy_ships_remaining: self.enemy_ships_remaining,
+            enemy_ships_remaining: self.enemy_ships_remaining(),
             enemy_remaining: self.enemy_remaining,
         }
     }
@@ -190,7 +233,11 @@ impl GameEngine {
             guess_hits: state.my_guesses.hits,
             guess_misses: state.my_guesses.misses,
             enemy_remaining: state.enemy_remaining,
-            enemy_ships_remaining: state.enemy_ships_remaining,
+            enemy_ships: core::array::from_fn(|i| {
+                let mut ship = state.my_guesses.ships[i].with_definition(SHIPS[i]);
+                ship.sunk = ship.sunk || !state.enemy_ships_remaining[i];
+                ship
+            }),
         }
     }
 
@@ -210,11 +257,28 @@ impl GameEngine {
     /// callers.
     pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS] {
         let mut lens = [0usize; NUM_SHIPS];
-        for (i, def) in SHIPS.iter().enumerate() {
-            if self.enemy_ships_remaining[i] {
-                lens[i] = def.length();
-            }
+        for (i, ship) in self.enemy_ships.iter().enumerate() {
+            let _ = SHIPS[i];
+            lens[i] = ship.remaining_length();
         }
         lens
     }
+
+    fn enemy_ships_remaining(&self) -> [bool; NUM_SHIPS] {
+        core::array::from_fn(|i| !self.enemy_ships[i].is_sunk())
+    }
+
+    fn sunk_enemy_footprints(&self) -> BB {
+        let mut footprints = BB::new();
+        for ship in self.enemy_ships.iter() {
+            if ship.is_sunk() {
+                footprints |= ship.mask();
+            }
+        }
+        footprints
+    }
+}
+
+fn initial_enemy_ships() -> [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS] {
+    core::array::from_fn(|i| Ship::unknown(SHIPS[i]))
 }

@@ -4,7 +4,7 @@ use battleship::domain::{
     GameStatus, GuessResult, RemotePlayer, RemoteSyncPayload, Ship, SyncPayload,
 };
 use battleship::protocol::WireMessage;
-use battleship::{BitBoard, BoardState, GameState, GuessBoardState, ShipState};
+use battleship::{BitBoard, BoardState, GameState, GuessBoardState, Ship as CoreShip, SHIPS};
 use proptest::prelude::*;
 
 /// Generate arbitrary messages for fuzzing
@@ -85,7 +85,12 @@ fn arb_guess_result() -> impl Strategy<Value = GuessResult> {
     prop_oneof![
         Just(GuessResult::Hit),
         Just(GuessResult::Miss),
-        any::<String>().prop_map(GuessResult::Sink),
+        (any::<String>(), any::<u128>()).prop_map(|(ship, footprint_bits)| {
+            GuessResult::Sink {
+                ship,
+                footprint: BitBoard::<u128, 10>::from_raw(footprint_bits),
+            }
+        }),
     ]
 }
 
@@ -205,11 +210,12 @@ fn arb_board_state() -> impl Strategy<Value = BoardState> {
         })
 }
 
-fn arb_ship_state() -> impl Strategy<Value = ShipState> {
-    use battleship::SHIPS;
+fn arb_ship_state() -> impl Strategy<Value = CoreShip<u128, 10>> {
     (
-        (0..SHIPS.len()).prop_map(|i| SHIPS[i].name()),
+        0..SHIPS.len(),
         any::<bool>(),
+        any::<u128>(),
+        any::<u128>(),
         prop_oneof![
             Just(None),
             (
@@ -223,20 +229,31 @@ fn arb_ship_state() -> impl Strategy<Value = ShipState> {
                 .prop_map(|(r, c, o)| Some((r, c, o)))
         ],
     )
-        .prop_map(|(name, sunk, position)| {
-            let mut state = ShipState::new(name);
+        .prop_map(|(idx, sunk, hits_bits, placement_bits, position)| {
+            let mut state = CoreShip::unknown(SHIPS[idx]);
             state.sunk = sunk;
+            state.hits = BitBoard::<u128, 10>::from_raw(hits_bits);
+            state.placement = BitBoard::<u128, 10>::from_raw(placement_bits);
             state.position = position;
             state
         })
 }
 
 fn arb_guess_board_state() -> impl Strategy<Value = GuessBoardState> {
-    (any::<u128>(), any::<u128>()).prop_map(|(hits_bits, misses_bits)| {
-        let hits = BitBoard::<u128, 10>::from_raw(hits_bits);
-        let misses = BitBoard::<u128, 10>::from_raw(misses_bits);
-        GuessBoardState { hits, misses }
-    })
+    (
+        any::<u128>(),
+        any::<u128>(),
+        prop::array::uniform5(arb_ship_state()),
+    )
+        .prop_map(|(hits_bits, misses_bits, ships)| {
+            let hits = BitBoard::<u128, 10>::from_raw(hits_bits);
+            let misses = BitBoard::<u128, 10>::from_raw(misses_bits);
+            GuessBoardState {
+                hits,
+                misses,
+                ships,
+            }
+        })
 }
 
 proptest! {
@@ -311,7 +328,10 @@ proptest! {
         let msg = WireMessage::StatusResp {
             version,
             seq,
-            res: GuessResult::Sink(large_name),
+            res: GuessResult::Sink {
+                ship: large_name,
+                footprint: BitBoard::<u128, 10>::new(),
+            },
         };
 
         let serialized = bincode::serialize(&msg);

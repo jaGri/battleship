@@ -1,4 +1,6 @@
-use battleship::{GameEngine, GuessResult as CommonGuessResult, BOARD_SIZE, NUM_SHIPS};
+use battleship::{
+    BitBoard, GameEngine, GuessResult as CommonGuessResult, BOARD_SIZE, NUM_SHIPS, SHIPS,
+};
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 
@@ -41,6 +43,44 @@ fn random_engine(seed: u64) -> GameEngine {
     }
 
     engine
+}
+
+#[test]
+fn sunk_footprint_is_removed_from_active_hits_and_round_trips() {
+    let mut engine = GameEngine::new();
+    engine.record_guess(4, 0, CommonGuessResult::Hit).unwrap();
+    let mut footprint = BitBoard::<u128, 10>::new();
+    footprint.set(4, 0).unwrap();
+    footprint.set(4, 1).unwrap();
+
+    engine
+        .record_sink_with_footprint(4, 1, "Destroyer", footprint)
+        .unwrap();
+
+    assert!(engine.guess_hits().get(4, 0).unwrap());
+    assert!(engine.guess_hits().get(4, 1).unwrap());
+    assert!(!engine.active_hits().get(4, 0).unwrap());
+    assert!(!engine.active_hits().get(4, 1).unwrap());
+    assert_eq!(engine.enemy_ship_lengths_remaining()[4], 0);
+    assert_eq!(engine.enemy_ships()[4].placement, footprint);
+
+    let restored = GameEngine::from_state(engine.state());
+    assert_eq!(restored.enemy_ships()[4].placement, footprint);
+    assert!(!restored.active_hits().get(4, 0).unwrap());
+    assert!(!restored.active_hits().get(4, 1).unwrap());
+}
+
+#[test]
+fn invalid_sunk_footprint_is_rejected() {
+    let mut engine = GameEngine::new();
+    engine.record_guess(4, 0, CommonGuessResult::Hit).unwrap();
+    let mut footprint = BitBoard::<u128, 10>::new();
+    footprint.set(4, 1).unwrap();
+
+    assert!(engine
+        .record_sink_with_footprint(4, 1, "Destroyer", footprint)
+        .is_err());
+    assert_eq!(engine.enemy_ship_lengths_remaining()[4], SHIPS[4].length());
 }
 
 proptest! {

@@ -3,7 +3,7 @@
 use super::bitboard::BitBoard;
 use super::common::{BoardError, GuessResult};
 use super::config::{BOARD_SIZE, NUM_SHIPS, SHIPS};
-use super::ship::{Orientation, Ship, ShipState};
+use super::ship::{Orientation, Ship};
 use core::fmt;
 use rand::Rng;
 
@@ -13,7 +13,7 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoardState {
-    pub ship_states: [ShipState; NUM_SHIPS],
+    pub ship_states: [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS],
     pub ship_map: BB,
     pub hits: BB,
     pub misses: BB,
@@ -22,7 +22,7 @@ pub struct BoardState {
 /// Main board state: ship placements, hits, misses.
 #[derive(Clone)]
 pub struct Board {
-    ships: [Option<Ship<u128, { BOARD_SIZE as usize }>>; NUM_SHIPS],
+    ships: [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS],
     ship_map: BB,
     hits: BB,
     misses: BB,
@@ -33,7 +33,7 @@ impl Board {
     pub fn new() -> Self {
         let empty = BB::new();
         Board {
-            ships: [None; NUM_SHIPS],
+            ships: core::array::from_fn(|i| Ship::unknown(SHIPS[i])),
             ship_map: empty,
             hits: empty,
             misses: empty,
@@ -41,26 +41,15 @@ impl Board {
     }
 
     /// Returns the public state of each ship.
-    pub fn ship_states(&self) -> [ShipState; NUM_SHIPS] {
-        core::array::from_fn(|i| match &self.ships[i] {
-            Some(s) => ShipState {
-                name: s.ship_type().name(),
-                sunk: s.is_sunk(),
-                position: Some((s.origin().0, s.origin().1, s.orientation())),
-            },
-            None => ShipState::new(SHIPS[i].name()),
-        })
+    pub fn ship_states(&self) -> [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS] {
+        self.ships
     }
 
     /// Returns `true` when all ships are sunk.
     pub fn all_sunk(&self) -> bool {
-        self.ships.iter().enumerate().all(|(i, s)| match s {
-            Some(ship) => ship.is_sunk(),
-            None => {
-                let _ = SHIPS[i];
-                false
-            }
-        })
+        self.ships
+            .iter()
+            .all(|ship| ship.is_placed() && ship.is_sunk())
     }
 
     /// Board occupancy mask of all ships.
@@ -78,6 +67,20 @@ impl Board {
         self.misses
     }
 
+    /// Occupancy mask for a named ship that has already been sunk.
+    pub fn sunk_ship_footprint(&self, ship_name: &str) -> Result<BB, BoardError> {
+        for ship in self.ships.iter() {
+            if ship.name == ship_name {
+                return if ship.is_sunk() {
+                    Ok(ship.mask())
+                } else {
+                    Err(BoardError::InvalidSunkShipFootprint)
+                };
+            }
+        }
+        Err(BoardError::NameNotFound)
+    }
+
     /// Place a single ship by index at (row, col) and orientation.
     pub fn place(
         &mut self,
@@ -89,7 +92,7 @@ impl Board {
         if ship_index >= NUM_SHIPS {
             return Err(BoardError::InvalidIndex);
         }
-        if self.ships[ship_index].is_some() {
+        if self.ships[ship_index].is_placed() {
             return Err(BoardError::ShipAlreadyPlaced);
         }
         let def = SHIPS[ship_index];
@@ -101,7 +104,7 @@ impl Board {
         }
         // record placement
         self.ship_map |= mask;
-        self.ships[ship_index] = Some(ship);
+        self.ships[ship_index] = ship;
         Ok(())
     }
 
@@ -155,12 +158,12 @@ impl Board {
             self.hits.set(row, col)?;
 
             // determine which ship was hit
-            for ship in self.ships.iter_mut().flatten() {
-                if ship.mask().get(row, col).unwrap_or(false) {
+            for ship in self.ships.iter_mut() {
+                if ship.covers(row, col) {
                     let was_sunk = ship.is_sunk();
-                    ship.guess(row, col);
+                    ship.record_hit(row, col);
                     if ship.is_sunk() && !was_sunk {
-                        return Ok(GuessResult::Sink(ship.ship_type().name()));
+                        return Ok(GuessResult::Sink(ship.name));
                     }
                     return Ok(GuessResult::Hit);
                 }
@@ -208,16 +211,7 @@ impl From<BoardState> for Board {
         board.hits = state.hits;
         board.misses = state.misses;
         for (i, &def) in SHIPS.iter().enumerate().take(NUM_SHIPS) {
-            if let Some(ship) =
-                Ship::<u128, { BOARD_SIZE as usize }>::from_state(&state.ship_states[i], def)
-                    .unwrap()
-            {
-                let mut ship = ship;
-                for (row, col) in state.hits.iter_set_bits() {
-                    ship.guess(row, col);
-                }
-                board.ships[i] = Some(ship);
-            }
+            board.ships[i] = state.ship_states[i].with_definition(def);
         }
         board
     }

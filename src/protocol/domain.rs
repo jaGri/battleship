@@ -3,7 +3,9 @@ use alloc::string::{String, ToString};
 #[cfg(feature = "std")]
 use std::string::{String, ToString};
 
-use crate::core::{GameStatus as CoreGameStatus, GuessBoardState};
+use crate::core::{BitBoard, GameStatus as CoreGameStatus, GuessBoardState, BOARD_SIZE};
+
+type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Board {/* grid, ships, hits/misses */}
@@ -20,7 +22,7 @@ pub struct Ship {
 pub enum GuessResult {
     Hit,
     Miss,
-    Sink(String),
+    Sink { ship: String, footprint: BB },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,7 +76,10 @@ impl From<crate::core::common::GuessResult> for GuessResult {
         match res {
             crate::core::common::GuessResult::Hit => GuessResult::Hit,
             crate::core::common::GuessResult::Miss => GuessResult::Miss,
-            crate::core::common::GuessResult::Sink(name) => GuessResult::Sink(name.to_string()),
+            crate::core::common::GuessResult::Sink(name) => GuessResult::Sink {
+                ship: name.to_string(),
+                footprint: BB::new(),
+            },
         }
     }
 }
@@ -89,8 +94,8 @@ impl From<CoreGameStatus> for GameStatus {
     }
 }
 
-impl From<crate::core::ship::ShipState> for Ship {
-    fn from(state: crate::core::ship::ShipState) -> Self {
+impl From<crate::core::ship::Ship<u128, { BOARD_SIZE as usize }>> for Ship {
+    fn from(state: crate::core::ship::Ship<u128, { BOARD_SIZE as usize }>) -> Self {
         Ship {
             name: state.name.to_string(),
             sunk: state.sunk,

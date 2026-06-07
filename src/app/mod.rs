@@ -1,9 +1,9 @@
 //! Application state machine and game orchestration.
 
 #[cfg(not(feature = "std"))]
-use alloc::{vec, vec::Vec};
+use alloc::{string::ToString, vec, vec::Vec};
 #[cfg(feature = "std")]
-use std::vec::Vec;
+use std::{string::ToString, vec::Vec};
 
 use rand::rngs::SmallRng;
 
@@ -11,7 +11,8 @@ use crate::agent::{
     AgentAction, AgentRequest, AiDifficulty, GameEvent, PlayerAgent, ShipPlacement,
 };
 use crate::engine::{
-    BoardError, GameEngine, GameState, GameStatus, GuessBoard, GuessBoardState, GuessResult, SHIPS,
+    BitBoard, BoardError, GameEngine, GameState, GameStatus, GuessBoard, GuessBoardState,
+    GuessResult, BOARD_SIZE, SHIPS,
 };
 use crate::input::UiEvent;
 use crate::protocol::domain::{RemotePlayer, RemoteSyncPayload};
@@ -28,6 +29,7 @@ const MAIN_MENU_ITEMS: [&str; 6] = [
 ];
 const SOLO_SETUP_ITEMS: [&str; 3] = ["Random placement", "Manual placement", "Back"];
 const DIFFICULTY_ITEMS: [&str; 5] = ["Easy", "Medium", "Hard", "Expert", "Back"];
+type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 /// Ship setup mode requested from an agent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -849,13 +851,21 @@ impl<A, O> BattleshipApp<A, O> {
                 return vec![AppCommand::Render];
             }
         };
+        let response_result = match protocol_guess_result(&self.match_state.local_engine, result) {
+            Ok(result) => result,
+            Err(_) => {
+                self.mark_remote_status(ConnectionStatus::OutOfSync);
+                self.state = AppState::ConnectionOverlay;
+                return vec![AppCommand::Render];
+            }
+        };
         self.finish_turn((row, col), result, false);
         if let MatchMode::Remote(session) = &mut self.match_mode {
             session.last_received_seq = Some(seq);
             let response = WireMessage::StatusResp {
                 version: PROTOCOL_VERSION,
                 seq,
-                res: result.into(),
+                res: response_result,
             };
             session.cached_response = Some(response.clone());
             let mut commands = vec![AppCommand::Send(response)];
@@ -881,7 +891,7 @@ impl<A, O> BattleshipApp<A, O> {
             return vec![AppCommand::Render];
         }
 
-        let result = match core_guess_result(res) {
+        let (result, footprint) = match core_guess_result(res) {
             Ok(result) => result,
             Err(_) => {
                 self.mark_remote_status(ConnectionStatus::OutOfSync);
@@ -894,12 +904,17 @@ impl<A, O> BattleshipApp<A, O> {
             MatchMode::Solo => None,
         };
         if let Some(coord) = coord {
-            if self
-                .match_state
-                .local_engine
-                .record_guess(coord.0, coord.1, result)
-                .is_err()
-            {
+            let record_result = match (result, footprint) {
+                (GuessResult::Sink(name), Some(footprint)) => self
+                    .match_state
+                    .local_engine
+                    .record_sink_with_footprint(coord.0, coord.1, name, footprint),
+                _ => self
+                    .match_state
+                    .local_engine
+                    .record_guess(coord.0, coord.1, result),
+            };
+            if record_result.is_err() {
                 self.mark_remote_status(ConnectionStatus::OutOfSync);
                 self.state = AppState::ConnectionOverlay;
                 return vec![AppCommand::Render];
@@ -959,9 +974,12 @@ impl<A, O> BattleshipApp<A, O> {
                     .as_mut()
                     .ok_or(BoardError::UnableToPlaceShip)?;
                 let result = opponent.opponent_guess(coord.0, coord.1)?;
-                self.match_state
-                    .local_engine
-                    .record_guess(coord.0, coord.1, result)?;
+                record_guess_with_optional_footprint(
+                    &mut self.match_state.local_engine,
+                    opponent,
+                    coord,
+                    result,
+                )?;
                 self.finish_turn(coord, result, true);
             }
             PlayerSide::Opponent => {
@@ -974,7 +992,12 @@ impl<A, O> BattleshipApp<A, O> {
                     .opponent_engine
                     .as_mut()
                     .ok_or(BoardError::UnableToPlaceShip)?;
-                opponent.record_guess(coord.0, coord.1, result)?;
+                record_guess_with_optional_footprint(
+                    opponent,
+                    &self.match_state.local_engine,
+                    coord,
+                    result,
+                )?;
                 self.finish_turn(coord, result, false);
             }
         }
@@ -1160,6 +1183,7 @@ impl<A, O> BattleshipApp<A, O> {
             public_shots: GuessBoardState {
                 hits: self.match_state.local_engine.guess_hits(),
                 misses: self.match_state.local_engine.guess_misses(),
+                ships: self.match_state.local_engine.enemy_ships(),
             },
             enemy_ships_remaining: state.enemy_ships_remaining,
             enemy_remaining: state.enemy_remaining,
@@ -1324,14 +1348,45 @@ where
     }
 }
 
-fn core_guess_result(res: crate::protocol::domain::GuessResult) -> Result<GuessResult, BoardError> {
+fn record_guess_with_optional_footprint(
+    recorder: &mut GameEngine,
+    defender: &GameEngine,
+    coord: (usize, usize),
+    result: GuessResult,
+) -> Result<(), BoardError> {
+    match result {
+        GuessResult::Sink(name) => {
+            let footprint = defender.board().sunk_ship_footprint(name)?;
+            recorder.record_sink_with_footprint(coord.0, coord.1, name, footprint)
+        }
+        _ => recorder.record_guess(coord.0, coord.1, result),
+    }
+}
+
+fn protocol_guess_result(
+    defender: &GameEngine,
+    result: GuessResult,
+) -> Result<crate::protocol::domain::GuessResult, BoardError> {
+    Ok(match result {
+        GuessResult::Hit => crate::protocol::domain::GuessResult::Hit,
+        GuessResult::Miss => crate::protocol::domain::GuessResult::Miss,
+        GuessResult::Sink(name) => crate::protocol::domain::GuessResult::Sink {
+            ship: name.to_string(),
+            footprint: defender.board().sunk_ship_footprint(name)?,
+        },
+    })
+}
+
+fn core_guess_result(
+    res: crate::protocol::domain::GuessResult,
+) -> Result<(GuessResult, Option<BB>), BoardError> {
     match res {
-        crate::protocol::domain::GuessResult::Hit => Ok(GuessResult::Hit),
-        crate::protocol::domain::GuessResult::Miss => Ok(GuessResult::Miss),
-        crate::protocol::domain::GuessResult::Sink(name) => SHIPS
+        crate::protocol::domain::GuessResult::Hit => Ok((GuessResult::Hit, None)),
+        crate::protocol::domain::GuessResult::Miss => Ok((GuessResult::Miss, None)),
+        crate::protocol::domain::GuessResult::Sink { ship, footprint } => SHIPS
             .iter()
-            .find(|ship| ship.name() == name)
-            .map(|ship| GuessResult::Sink(ship.name()))
+            .find(|def| def.name() == ship)
+            .map(|def| (GuessResult::Sink(def.name()), Some(footprint)))
             .ok_or(BoardError::NameNotFound),
     }
 }

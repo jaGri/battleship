@@ -1,4 +1,6 @@
-use battleship::{sample_pdf, AiAgent, AiDifficulty, BattleshipApp, BitBoard, Board, GuessBoard};
+use battleship::{
+    calc_pdf, sample_pdf, AiAgent, AiDifficulty, BattleshipApp, BitBoard, Board, GuessBoard,
+};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use std::collections::HashMap;
@@ -62,6 +64,22 @@ fn ai_agents_place_and_select_targets() {
         let target = ai.select_target(&mut rng, &guess_board, &[5, 4, 3, 3, 2]);
         assert!(target.0 < 10 && target.1 < 10);
     }
+}
+
+#[test]
+fn sunk_hits_do_not_boost_ai_targeting_pdf() {
+    let mut hits = BB::new();
+    hits.set(4, 0).unwrap();
+    hits.set(4, 1).unwrap();
+    let active_hits = BB::new();
+    let misses = BB::new();
+    let sunk = hits;
+    let remaining = [5, 4, 3, 3, 0];
+
+    let pdf_with_sunk_filter = calc_pdf(&active_hits, &misses, &sunk, &remaining, 13.0);
+    let pdf_without_sunk_filter = calc_pdf(&hits, &misses, &BB::new(), &remaining, 13.0);
+
+    assert!(pdf_without_sunk_filter[4][2] > pdf_with_sunk_filter[4][2]);
 }
 
 #[test]

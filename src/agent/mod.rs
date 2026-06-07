@@ -155,17 +155,18 @@ impl AiAgent {
         guess_board: &GuessBoard,
         remaining: &[usize],
     ) -> Coordinate {
-        self.current_hits = guess_board.hits;
+        self.current_hits = guess_board.active_hits;
 
         let mut lengths = [0usize; NUM_SHIPS];
         for (idx, &length) in remaining.iter().enumerate().take(NUM_SHIPS) {
             lengths[idx] = length;
         }
 
+        let sunk = self.sunk | (guess_board.hits & !guess_board.active_hits);
         let guess = ai::calc_pdf_and_guess(
-            &guess_board.hits,
+            &guess_board.active_hits,
             &guess_board.misses,
-            &self.sunk,
+            &sunk,
             &lengths,
             rng,
             self.temperature,

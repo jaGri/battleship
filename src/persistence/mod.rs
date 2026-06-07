@@ -170,5 +170,10 @@ fn restore_ship_names(game: &mut SavedGame) {
 fn restore_engine_ship_names(state: &mut GameState) {
     for (ship_state, ship) in state.my_board.ship_states.iter_mut().zip(SHIPS.iter()) {
         ship_state.name = ship.name();
+        ship_state.length = ship.length();
+    }
+    for (ship_state, ship) in state.my_guesses.ships.iter_mut().zip(SHIPS.iter()) {
+        ship_state.name = ship.name();
+        ship_state.length = ship.length();
     }
 }
