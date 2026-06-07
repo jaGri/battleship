@@ -1,10 +1,14 @@
 #![cfg(feature = "std")]
 
+#[cfg(feature = "in-memory")]
 use battleship::transport::TransportEndpoint;
-use battleship::{
-    AiAgent, AiDifficulty, AppCommand, AppEvent, BattleshipApp, InMemoryTransport, MemorySaveStore,
-    SaveStore, ScreenView, UiEvent, WireMessage, PROTOCOL_VERSION,
-};
+#[cfg(feature = "in-memory")]
+use battleship::InMemoryTransport;
+use battleship::{AiAgent, AiDifficulty, AppCommand, AppEvent, BattleshipApp, ScreenView, UiEvent};
+#[cfg(feature = "persistence")]
+use battleship::{MemorySaveStore, SaveStore};
+#[cfg(feature = "in-memory")]
+use battleship::{WireMessage, PROTOCOL_VERSION};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -48,6 +52,7 @@ fn app_loaded_event_restores_saved_game() {
 }
 
 #[test]
+#[cfg(feature = "persistence")]
 fn memory_save_store_round_trips_active_game() {
     let mut store = MemorySaveStore::default();
     let app = BattleshipApp::new_local_ai(
@@ -63,6 +68,7 @@ fn memory_save_store_round_trips_active_game() {
 }
 
 #[test]
+#[cfg(feature = "in-memory")]
 fn in_memory_endpoint_sends_wire_messages_without_awaiting() {
     let (mut left, mut right) = InMemoryTransport::pair();
     let msg = WireMessage::Heartbeat {

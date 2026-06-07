@@ -56,6 +56,16 @@ pub mod persistence;
 #[cfg(feature = "data-generation")]
 pub mod data_generation;
 
+#[cfg(feature = "web")]
+pub mod web;
+
+#[cfg(feature = "web")]
+pub use web::{
+    WebBoardCell, WebBoardView, WebConnectionView, WebGameEvent, WebGameStatus, WebGuessBoardView,
+    WebGuessCell, WebGuessResult, WebInput, WebInputError, WebInputEvent, WebMenuView,
+    WebMessageView, WebOrientation, WebRenderer, WebScreenView, WebShipPlacement, WebShipView,
+};
+
 // ========================================
 // Layer 3: Protocol & RPC
 // ========================================

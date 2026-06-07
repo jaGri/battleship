@@ -10,6 +10,7 @@ Current snapshot of the Battleship codebase after the adapter refactor.
 - `input`: platform-neutral `UiEvent` values and input-source traits.
 - `render`: passive screen views and renderer trait.
 - `render_cli`: std-only CLI input and rendering adapters.
+- `web`: feature-gated browser input normalization and owned `ScreenView` serialization models.
 - `protocol`: versioned `WireMessage` values and domain payloads.
 - `transport`: app-facing `TransportEndpoint` plus std async TCP, heartbeat, and in-memory adapters.
 - `persistence`: adapter-neutral snapshots and `SaveStore` for app runners.
@@ -23,7 +24,7 @@ runner/main
     v
 BattleshipApp
     |-- PlayerAgent implementations
-    |-- Renderer / ScreenView
+    |-- Renderer / ScreenView / web view models
     |-- InputSource / UiEvent
     |-- TransportEndpoint / WireMessage
     `-- SaveStore / SavedGame
@@ -38,7 +39,7 @@ BattleshipApp
 
 The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
 
-The active root crate no longer has a `src/interface` module. Historical planning notes may still describe legacy web interface work, but the current `web` and `websocket` features are adapter boundaries; completing a web runtime belongs to the separate web-adapter migration plan.
+The active root crate no longer has a `src/interface` module. The `web` feature now exposes focused input and render adapters; the `websocket` feature remains a transport boundary for runners that bridge `WireMessage` values into `BattleshipApp`.
 
 ## Testing
 

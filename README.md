@@ -10,6 +10,7 @@ Rust Battleship implementation with a no_std-compatible rules engine and adapter
 - `input`: platform-neutral UI events.
 - `render`: passive screen views and renderer trait.
 - `render_cli`: CLI input and rendering adapters.
+- `web`: web input normalization and owned web view models.
 - `protocol`: versioned `WireMessage` payloads.
 - `transport`: nonblocking app endpoint plus TCP, heartbeat, in-memory, WebSocket, and BLE boundaries.
 - `persistence`: saved-game snapshots and `SaveStore`.

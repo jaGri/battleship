@@ -121,16 +121,12 @@ impl RemoteSession {
 }
 
 /// Current match mode.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum MatchMode {
+    #[default]
     Solo,
     Remote(RemoteSession),
-}
-
-impl Default for MatchMode {
-    fn default() -> Self {
-        Self::Solo
-    }
 }
 
 /// Agent work kind a runner may need to schedule.
