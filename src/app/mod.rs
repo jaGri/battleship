@@ -45,13 +45,20 @@ pub enum AppEvent {
     Loaded(Option<SavedGame>),
 }
 
+/// Agent work a runner may need to schedule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentPrompt {
+    PlaceShips,
+    SelectTarget,
+}
+
 /// Commands emitted by the app runner.
-pub enum AppCommand<'a> {
+pub enum AppCommand {
     Render,
     Send(WireMessage),
     Save(SavedGame),
     ClearSave,
-    RequestAgent(AgentRequest<'a>),
+    RequestAgent(AgentPrompt),
 }
 
 /// Local match state. Remote games can leave `opponent_engine` empty.
@@ -123,7 +130,7 @@ impl<A, O> BattleshipApp<A, O> {
         })
     }
 
-    pub fn update(&mut self, event: AppEvent) -> Vec<AppCommand<'_>> {
+    pub fn update(&mut self, event: AppEvent) -> Vec<AppCommand> {
         match event {
             AppEvent::Loaded(Some(saved)) => {
                 self.match_state = MatchState::from_saved_game(saved);
@@ -146,7 +153,7 @@ where
         &mut self,
         local_rng: &mut SmallRng,
         opponent_rng: &mut SmallRng,
-    ) -> Result<Vec<AppCommand<'_>>, BoardError>
+    ) -> Result<Vec<AppCommand>, BoardError>
     where
         A::Error: core::fmt::Debug,
         O::Error: core::fmt::Debug,
@@ -189,7 +196,7 @@ where
         &mut self,
         local_rng: &mut SmallRng,
         opponent_rng: &mut SmallRng,
-    ) -> Result<Vec<AppCommand<'_>>, BoardError>
+    ) -> Result<Vec<AppCommand>, BoardError>
     where
         A::Error: core::fmt::Debug,
         O::Error: core::fmt::Debug,
