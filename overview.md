@@ -13,7 +13,7 @@ Current snapshot of the Battleship codebase after the adapter refactor.
 - `web`: feature-gated browser input normalization and owned `ScreenView` serialization models.
 - `protocol`: versioned `WireMessage` values and domain payloads.
 - `transport`: app-facing `TransportEndpoint` plus std async TCP, heartbeat, and in-memory adapters.
-- `persistence`: adapter-neutral snapshots and `SaveStore` for app runners.
+- `persistence`: adapter-neutral snapshots, `SaveStore`, and file-backed active saves for app runners.
 - `data_generation`: feature-gated boundary for AI simulation datasets.
 
 The core game mechanics remain library-first and no_std-compatible. Optional std features provide CLI, TCP, WebSocket, persistence, logging, BLE boundaries, and data-generation support.
@@ -37,7 +37,7 @@ BattleshipApp
 
 `BattleshipApp` owns match orchestration. Agents choose placements or targets when requested; renderers receive passive `ScreenView` values; transports move `WireMessage` payloads; runners decide how to execute emitted `AppCommand` values.
 
-The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
+The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. It executes app save/load commands through a `FileSaveStore`, using `battleship.sav` in the current working directory as the active save. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
 
 The active root crate no longer has a `src/interface` module. The `web` feature now exposes focused input and render adapters; the `websocket` feature remains a transport boundary for runners that bridge `WireMessage` values into `BattleshipApp`.
 
@@ -47,7 +47,7 @@ The active test suite covers:
 
 - Engine, board, bitboard, and serialization round trips.
 - AI agent target selection and local app game completion.
-- App view generation, saved-game restoration, and in-memory save stores.
+- App view generation, saved-game restoration, in-memory save stores, and file-backed active saves.
 - In-memory nonblocking transport endpoint behavior.
 - TCP framing, malformed frames, cross-version handshakes, fuzz cases, and transport resilience.
 
@@ -57,10 +57,10 @@ Legacy mixed-player and RPC tests were removed with the old architecture.
 
 - `default = ["std", "cli", "ai", "tcp", "logging"]`
 - `std`: standard-library build support for current async/protocol code.
-- `cli`: CLI runner and renderer.
+- `cli`: CLI runner, renderer, and file-backed active saves.
 - `tcp`: TCP transport support.
 - `in-memory`: in-memory transport support for tests/runners.
-- `persistence`: app-facing save snapshots and stores.
+- `persistence`: app-facing save snapshots, in-memory stores, and file-backed stores.
 - `websocket`, `web`, `ble`, `esp-idf`, `data-generation`, `logging`: optional adapter boundaries.
 
 ## Verification Checklist

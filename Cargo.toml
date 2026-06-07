@@ -34,7 +34,7 @@ thiserror = { version = "1.0", optional = true }
 [features]
 default = ["std", "cli", "ai", "tcp", "logging"]
 std = ["rand/thread_rng", "anyhow/std", "tokio", "async-trait", "serde", "bincode", "clap"]
-cli = ["std"]
+cli = ["std", "persistence"]
 ai = []
 tcp = ["std"]
 in-memory = ["std"]

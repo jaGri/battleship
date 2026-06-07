@@ -4,7 +4,7 @@ use battleship::domain::RemotePlayer;
 use battleship::{
     AgentAction, AgentPromptKind, AiDifficulty, AppCommand, AppEvent, AppState, BattleshipApp,
     BitBoard, ConnectionStatus, GuessBoardState, MatchMode, Orientation, PlacementMode, PlayerSide,
-    RemoteRole, ScriptedAgent, ShipPlacement, UiEvent, WireMessage, PROTOCOL_VERSION,
+    RemoteRole, SavedGame, ScriptedAgent, ShipPlacement, UiEvent, WireMessage, PROTOCOL_VERSION,
 };
 
 fn placements() -> AgentAction {
@@ -64,6 +64,49 @@ fn setup_solo(app: &mut BattleshipApp<ScriptedAgent, ScriptedAgent>) -> Vec<AppC
     })
 }
 
+fn ship_targets() -> Vec<(usize, usize)> {
+    vec![
+        (0, 0),
+        (0, 1),
+        (0, 2),
+        (0, 3),
+        (0, 4),
+        (1, 0),
+        (1, 1),
+        (1, 2),
+        (1, 3),
+        (2, 0),
+        (2, 1),
+        (2, 2),
+        (3, 0),
+        (3, 1),
+        (3, 2),
+        (4, 0),
+        (4, 1),
+    ]
+}
+
+fn safe_misses() -> Vec<(usize, usize)> {
+    vec![
+        (9, 9),
+        (9, 8),
+        (9, 7),
+        (9, 6),
+        (9, 5),
+        (9, 4),
+        (9, 3),
+        (9, 2),
+        (9, 1),
+        (9, 0),
+        (8, 9),
+        (8, 8),
+        (8, 7),
+        (8, 6),
+        (8, 5),
+        (8, 4),
+    ]
+}
+
 #[test]
 fn title_menu_and_solo_setup_request_placements() {
     let mut app = new_app();
@@ -102,15 +145,14 @@ fn solo_setup_manual_selection_requests_manual_placement() {
 }
 
 #[test]
-fn resume_placeholder_renders_notice_without_leaving_menu() {
+fn resume_menu_requests_active_save_load() {
     let mut app = new_app();
     app.update(AppEvent::Ui(UiEvent::Start));
     app.update(AppEvent::Ui(UiEvent::Down));
     let commands = app.update(AppEvent::Ui(UiEvent::Confirm));
 
     assert_eq!(app.state, AppState::MainMenu);
-    assert_eq!(commands, vec![AppCommand::Render]);
-    assert_eq!(app.last_notice, Some("Resume is not wired yet."));
+    assert_eq!(commands, vec![AppCommand::LoadActiveSave]);
 }
 
 #[test]
@@ -199,8 +241,68 @@ fn invalid_agent_action_keeps_state_and_renders() {
 #[test]
 fn loaded_none_clears_save_and_renders() {
     let mut app = new_app();
+    app.update(AppEvent::Ui(UiEvent::Start));
     let commands = app.update(AppEvent::Loaded(None));
+
+    assert_eq!(app.state, AppState::MainMenu);
+    assert_eq!(app.selected_menu_item, 1);
+    assert_eq!(app.last_notice, Some("No saved game."));
     assert_eq!(commands, vec![AppCommand::ClearSave, AppCommand::Render]);
+}
+
+#[test]
+fn loaded_saved_game_enters_playing_and_requests_next_turn() {
+    let mut app = new_app();
+    setup_solo(&mut app);
+    app.update(AppEvent::Agent {
+        side: PlayerSide::Local,
+        action: AgentAction::Fire((9, 9)),
+    });
+    let saved = app.match_state.saved_game();
+
+    let mut restored = new_app();
+    let commands = restored.update(AppEvent::Loaded(Some(saved)));
+
+    assert_eq!(restored.state, AppState::Playing);
+    assert_eq!(restored.match_state.turn_number, saved.turn_number);
+    assert!(matches!(
+        commands.as_slice(),
+        [
+            AppCommand::Save(SavedGame { .. }),
+            AppCommand::RequestAgent(prompt),
+            AppCommand::Render
+        ] if prompt.side == PlayerSide::Opponent
+            && prompt.kind == AgentPromptKind::SelectTarget
+    ));
+}
+
+#[test]
+fn game_over_turn_clears_active_save() {
+    let mut app = new_app();
+    setup_solo(&mut app);
+    let mut last_commands = Vec::new();
+
+    for (index, target) in ship_targets().into_iter().enumerate() {
+        last_commands = app.update(AppEvent::Agent {
+            side: PlayerSide::Local,
+            action: AgentAction::Fire(target),
+        });
+
+        if app.state == AppState::GameOver {
+            break;
+        }
+
+        app.update(AppEvent::Agent {
+            side: PlayerSide::Opponent,
+            action: AgentAction::Fire(safe_misses()[index]),
+        });
+    }
+
+    assert_eq!(app.state, AppState::GameOver);
+    assert!(matches!(last_commands.first(), Some(AppCommand::ClearSave)));
+    assert!(!last_commands
+        .iter()
+        .any(|command| matches!(command, AppCommand::Save(_))));
 }
 
 #[test]

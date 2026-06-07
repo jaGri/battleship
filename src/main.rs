@@ -4,8 +4,9 @@ fn main() {}
 #[cfg(feature = "std")]
 use battleship::{
     AgentAction, AgentPrompt, AgentPromptKind, AgentRequest, AiAgent, AiDifficulty, AppCommand,
-    AppEvent, AppState, BattleshipApp, Board, CliInput, CliRenderer, GuessBoard, HumanAgent,
-    InputSource, PlacementMode, PlayerAgent, PlayerSide, Renderer, ShipPlacement, UiEvent, SHIPS,
+    AppEvent, AppState, BattleshipApp, Board, CliInput, CliRenderer, FileSaveStore, GuessBoard,
+    HumanAgent, InputSource, PlacementMode, PlayerAgent, PlayerSide, Renderer, SaveStore,
+    ShipPlacement, UiEvent, SHIPS,
 };
 #[cfg(feature = "std")]
 use clap::Parser;
@@ -15,6 +16,9 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 #[cfg(feature = "std")]
 use std::io::{self, Write};
+
+#[cfg(feature = "std")]
+const DEFAULT_SAVE_PATH: &str = "battleship.sav";
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -34,6 +38,7 @@ struct CliRuntime {
     input: CliInput,
     local_rng: SmallRng,
     opponent_rng: SmallRng,
+    save_store: FileSaveStore,
     difficulty: AiDifficulty,
     quiet: bool,
 }
@@ -53,6 +58,7 @@ fn main() -> anyhow::Result<()> {
         input: CliInput::new(),
         local_rng,
         opponent_rng,
+        save_store: FileSaveStore::new(DEFAULT_SAVE_PATH),
         difficulty: cli.difficulty,
         quiet: cli.quiet,
     };
@@ -106,7 +112,17 @@ fn handle_commands(
         match command {
             AppCommand::Render if !runtime.quiet => runtime.renderer.render(&app.view())?,
             AppCommand::Render => {}
-            AppCommand::Save(_) | AppCommand::ClearSave | AppCommand::Send(_) => {}
+            AppCommand::Send(_) => {}
+            AppCommand::LoadActiveSave => {
+                let saved = runtime.save_store.load_active()?;
+                commands.extend(app.update(AppEvent::Loaded(saved)));
+            }
+            AppCommand::Save(saved) => {
+                runtime.save_store.save_active(&saved)?;
+            }
+            AppCommand::ClearSave => {
+                runtime.save_store.clear_active()?;
+            }
             AppCommand::ConfigureDifficulty(next) => {
                 runtime.difficulty = next;
                 app.opponent_agent = AiAgent::new(runtime.difficulty);

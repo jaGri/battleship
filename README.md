@@ -13,7 +13,7 @@ Rust Battleship implementation with a no_std-compatible rules engine and adapter
 - `web`: web input normalization and owned web view models.
 - `protocol`: versioned `WireMessage` payloads.
 - `transport`: nonblocking app endpoint plus TCP, heartbeat, in-memory, WebSocket, and BLE boundaries.
-- `persistence`: saved-game snapshots and `SaveStore`.
+- `persistence`: saved-game snapshots, `SaveStore`, and file-backed active saves.
 - `data_generation`: optional AI simulation data boundary.
 
 ## Commands
@@ -29,6 +29,10 @@ Run a local human-vs-AI game:
 ```bash
 cargo run -- --seed 123 --difficulty hard
 ```
+
+The CLI runner saves active games to `battleship.sav` in the current working
+directory. Use "Resume Game" from the main menu to load that active save; the
+file is cleared when a game ends.
 
 Run the default test suite:
 

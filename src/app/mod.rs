@@ -186,6 +186,7 @@ pub enum AppEvent {
 pub enum AppCommand {
     Render,
     Send(WireMessage),
+    LoadActiveSave,
     Save(SavedGame),
     ClearSave,
     ConfigureDifficulty(AiDifficulty),
@@ -346,7 +347,13 @@ impl<A, O> BattleshipApp<A, O> {
                 self.pending_prompt = None;
                 self.save_request_and_render()
             }
-            AppEvent::Loaded(None) => vec![AppCommand::ClearSave, AppCommand::Render],
+            AppEvent::Loaded(None) => {
+                self.state = AppState::MainMenu;
+                self.selected_menu_item = 1;
+                self.pending_prompt = None;
+                self.last_notice = Some("No saved game.");
+                vec![AppCommand::ClearSave, AppCommand::Render]
+            }
             AppEvent::TransportConnected => self.handle_transport_connected(),
             AppEvent::TransportDisconnected => self.handle_transport_disconnected(),
             AppEvent::Ui(event) => self.handle_ui(event),
@@ -405,10 +412,7 @@ impl<A, O> BattleshipApp<A, O> {
             }
             UiEvent::Confirm | UiEvent::Start => match self.selected_menu_item {
                 0 => self.start_solo_setup(),
-                1 => {
-                    self.last_notice = Some("Resume is not wired yet.");
-                    vec![AppCommand::Render]
-                }
+                1 => vec![AppCommand::LoadActiveSave],
                 2 => self.start_remote_pairing(RemoteRole::Host),
                 3 => self.start_remote_pairing(RemoteRole::Guest),
                 4 => self.start_difficulty_menu(),
@@ -1002,7 +1006,11 @@ impl<A, O> BattleshipApp<A, O> {
     }
 
     fn after_turn_commands(&mut self) -> Vec<AppCommand> {
-        let mut commands = vec![AppCommand::Save(self.match_state.saved_game())];
+        let mut commands = if self.state == AppState::GameOver {
+            vec![AppCommand::ClearSave]
+        } else {
+            vec![AppCommand::Save(self.match_state.saved_game())]
+        };
         commands.extend(self.observe_commands());
         if self.state == AppState::Playing {
             commands.extend(self.request_current_turn_agent_without_render());
