@@ -17,7 +17,10 @@ pub use async_trait;
 /// Messages exchanged between the game engine and a remote client.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum WireMessage {
     /// Handshake message to establish connection and negotiate protocol version.
     Handshake { version: u8 },

@@ -14,6 +14,20 @@ use crate::agent::{AiDifficulty, Coordinate};
 use crate::app::SavedGame;
 use crate::engine::{GameState, SHIPS};
 
+#[cfg(feature = "std")]
+const SAVE_MAGIC: &[u8; 4] = b"BSAV";
+#[cfg(feature = "std")]
+const SAVE_VERSION: u8 = 1;
+#[cfg(feature = "std")]
+const SAVE_LENGTH_BYTES: usize = 8;
+#[cfg(feature = "std")]
+const SAVE_MAC_BYTES: usize = 32;
+#[cfg(feature = "std")]
+const SAVE_HEADER_BYTES: usize =
+    SAVE_MAGIC.len() + core::mem::size_of::<u8>() + SAVE_LENGTH_BYTES + SAVE_MAC_BYTES;
+#[cfg(feature = "std")]
+const SAVE_AUTH_KEY: [u8; 32] = *b"battleship local save auth key!!";
+
 /// Persisted agent state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -98,6 +112,17 @@ impl FileSaveStore {
 pub enum FileSaveError {
     Io(io::Error),
     Codec(Box<bincode::ErrorKind>),
+    Integrity(SaveIntegrityError),
+}
+
+/// Integrity errors returned while authenticating a file save envelope.
+#[cfg(feature = "std")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SaveIntegrityError {
+    Header,
+    Version,
+    Length,
+    Mac,
 }
 
 #[cfg(feature = "std")]
@@ -106,12 +131,28 @@ impl core::fmt::Display for FileSaveError {
         match self {
             Self::Io(err) => write!(f, "save file I/O failed: {err}"),
             Self::Codec(err) => write!(f, "save file codec failed: {err}"),
+            Self::Integrity(err) => write!(f, "save file integrity check failed: {err}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl core::fmt::Display for SaveIntegrityError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Header => write!(f, "invalid header"),
+            Self::Version => write!(f, "unsupported version"),
+            Self::Length => write!(f, "invalid payload length"),
+            Self::Mac => write!(f, "authentication tag mismatch"),
         }
     }
 }
 
 #[cfg(feature = "std")]
 impl std::error::Error for FileSaveError {}
+
+#[cfg(feature = "std")]
+impl std::error::Error for SaveIntegrityError {}
 
 #[cfg(feature = "std")]
 impl From<io::Error> for FileSaveError {
@@ -134,7 +175,8 @@ impl SaveStore for FileSaveStore {
     fn load_active(&mut self) -> Result<Option<SavedGame>, Self::Error> {
         match fs::read(&self.path) {
             Ok(bytes) => {
-                let mut game: SavedGame = bincode::deserialize(&bytes)?;
+                let payload = open_save_envelope(&bytes)?;
+                let mut game: SavedGame = bincode::deserialize(payload)?;
                 restore_ship_names(&mut game);
                 Ok(Some(game))
             }
@@ -144,7 +186,8 @@ impl SaveStore for FileSaveStore {
     }
 
     fn save_active(&mut self, game: &SavedGame) -> Result<(), Self::Error> {
-        let bytes = bincode::serialize(game)?;
+        let payload = bincode::serialize(game)?;
+        let bytes = seal_save_envelope(&payload)?;
         fs::write(&self.path, bytes)?;
         Ok(())
     }
@@ -156,6 +199,77 @@ impl SaveStore for FileSaveStore {
             Err(err) => Err(err.into()),
         }
     }
+}
+
+#[cfg(feature = "std")]
+fn seal_save_envelope(payload: &[u8]) -> Result<Vec<u8>, FileSaveError> {
+    let payload_len = u64::try_from(payload.len())
+        .map_err(|_| FileSaveError::Integrity(SaveIntegrityError::Length))?;
+    let length_bytes = payload_len.to_be_bytes();
+    let mac = save_mac(&length_bytes, payload);
+
+    let mut bytes = Vec::with_capacity(SAVE_HEADER_BYTES + payload.len());
+    bytes.extend_from_slice(SAVE_MAGIC);
+    bytes.push(SAVE_VERSION);
+    bytes.extend_from_slice(&length_bytes);
+    bytes.extend_from_slice(mac.as_bytes());
+    bytes.extend_from_slice(payload);
+    Ok(bytes)
+}
+
+#[cfg(feature = "std")]
+fn open_save_envelope(bytes: &[u8]) -> Result<&[u8], FileSaveError> {
+    if bytes.len() < SAVE_HEADER_BYTES || &bytes[..SAVE_MAGIC.len()] != SAVE_MAGIC {
+        return Err(FileSaveError::Integrity(SaveIntegrityError::Header));
+    }
+
+    let version_offset = SAVE_MAGIC.len();
+    if bytes[version_offset] != SAVE_VERSION {
+        return Err(FileSaveError::Integrity(SaveIntegrityError::Version));
+    }
+
+    let length_offset = version_offset + core::mem::size_of::<u8>();
+    let mac_offset = length_offset + SAVE_LENGTH_BYTES;
+    let payload_offset = mac_offset + SAVE_MAC_BYTES;
+
+    let length_bytes: [u8; SAVE_LENGTH_BYTES] = bytes[length_offset..mac_offset]
+        .try_into()
+        .map_err(|_| FileSaveError::Integrity(SaveIntegrityError::Length))?;
+    let payload_len = u64::from_be_bytes(length_bytes);
+    let payload_len = usize::try_from(payload_len)
+        .map_err(|_| FileSaveError::Integrity(SaveIntegrityError::Length))?;
+    if bytes.len() != payload_offset + payload_len {
+        return Err(FileSaveError::Integrity(SaveIntegrityError::Length));
+    }
+
+    let expected_mac = save_mac(&length_bytes, &bytes[payload_offset..]);
+    let actual_mac = &bytes[mac_offset..payload_offset];
+    if !mac_eq(expected_mac.as_bytes(), actual_mac) {
+        return Err(FileSaveError::Integrity(SaveIntegrityError::Mac));
+    }
+
+    Ok(&bytes[payload_offset..])
+}
+
+#[cfg(feature = "std")]
+fn save_mac(length_bytes: &[u8; SAVE_LENGTH_BYTES], payload: &[u8]) -> blake3::Hash {
+    let mut hasher = blake3::Hasher::new_keyed(&SAVE_AUTH_KEY);
+    hasher.update(SAVE_MAGIC);
+    hasher.update(&[SAVE_VERSION]);
+    hasher.update(length_bytes);
+    hasher.update(payload);
+    hasher.finalize()
+}
+
+#[cfg(feature = "std")]
+fn mac_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter()
+        .zip(right.iter())
+        .fold(0u8, |diff, (a, b)| diff | (a ^ b))
+        == 0
 }
 
 #[cfg(feature = "std")]

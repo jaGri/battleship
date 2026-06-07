@@ -8,7 +8,10 @@ use super::common::BoardError;
 
 /// Orientation of a ship on the board.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum Orientation {
     Horizontal,
     Vertical,
@@ -40,12 +43,15 @@ impl ShipDef {
 
 /// Shared ship state for owned ships and revealed enemy ships.
 #[derive(Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Ship<T, const N: usize>
 where
     T: PrimInt + Unsigned + Zero,
 {
-    #[cfg_attr(feature = "std", serde(skip))]
+    #[cfg_attr(any(feature = "std", feature = "ble"), serde(skip))]
     pub name: &'static str,
     pub length: usize,
     pub sunk: bool,

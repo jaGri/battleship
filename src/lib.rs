@@ -36,8 +36,8 @@ pub use app::{
 pub use input::{InputSource, UiEvent};
 #[cfg(feature = "persistence")]
 pub use persistence::{
-    AdapterState, AgentSnapshot, FileSaveError, FileSaveStore, MemorySaveStore, SaveStore,
-    UiSnapshot,
+    AdapterState, AgentSnapshot, FileSaveError, FileSaveStore, MemorySaveStore, SaveIntegrityError,
+    SaveStore, UiSnapshot,
 };
 pub use render::{Renderer, ScreenView};
 

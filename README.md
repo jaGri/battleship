@@ -32,11 +32,18 @@ cargo run -- --seed 123 --difficulty hard
 
 The CLI runner saves active games to `battleship.sav` in the current working
 directory. Use "Resume Game" from the main menu to load that active save; the
-file is cleared when a game ends.
+file is cleared when a game ends. File saves are authenticated with a keyed
+BLAKE3 envelope so corrupted or casually tampered saves are rejected before
+deserialization. They are not encrypted.
 
 Remote runner adapters can use `TransportCommandRunner<T>` to execute
 `AppCommand::Send` values through a `TransportEndpoint` and feed inbound
 `WireMessage` values back into `BattleshipApp`.
+
+Embedded and remote runners own their platform security boundaries. BLE link
+security, pairing, platform entropy, timestamps, and remote anti-cheat/auth
+belong in the runner or platform adapter; core game rules, app orchestration,
+and transports only move typed game messages.
 
 Run the default test suite:
 

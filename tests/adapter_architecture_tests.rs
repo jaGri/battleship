@@ -6,6 +6,8 @@ use battleship::transport::TransportEndpoint;
 use battleship::InMemoryTransport;
 use battleship::{AiAgent, AiDifficulty, AppCommand, AppEvent, BattleshipApp, ScreenView, UiEvent};
 #[cfg(feature = "persistence")]
+use battleship::{FileSaveError, SaveIntegrityError};
+#[cfg(feature = "persistence")]
 use battleship::{FileSaveStore, MemorySaveStore, SaveStore};
 #[cfg(feature = "in-memory")]
 use battleship::{WireMessage, PROTOCOL_VERSION};
@@ -13,6 +15,8 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 #[cfg(feature = "persistence")]
 use std::path::PathBuf;
+#[cfg(feature = "persistence")]
+use std::{fs, io};
 
 #[test]
 fn app_generates_game_screen_view() {
@@ -89,6 +93,100 @@ fn file_save_store_round_trips_active_game() {
 
 #[test]
 #[cfg(feature = "persistence")]
+fn file_save_store_rejects_tampered_payload() {
+    let path = test_save_path("tampered-payload");
+    let mut store = FileSaveStore::new(&path);
+    store.clear_active().unwrap();
+    let app = BattleshipApp::new_local_ai(
+        AiAgent::new(AiDifficulty::Hard),
+        AiAgent::new(AiDifficulty::Hard),
+    );
+
+    store.save_active(&app.match_state.saved_game()).unwrap();
+    let mut bytes = fs::read(&path).unwrap();
+    let last = bytes.last_mut().unwrap();
+    *last ^= 0x01;
+    fs::write(&path, bytes).unwrap();
+
+    let err = store.load_active().unwrap_err();
+    assert!(matches!(
+        err,
+        FileSaveError::Integrity(SaveIntegrityError::Mac)
+    ));
+    cleanup_save_path(&path);
+}
+
+#[test]
+#[cfg(feature = "persistence")]
+fn file_save_store_rejects_tampered_header() {
+    let path = test_save_path("tampered-header");
+    let mut store = FileSaveStore::new(&path);
+    store.clear_active().unwrap();
+    let app = BattleshipApp::new_local_ai(
+        AiAgent::new(AiDifficulty::Hard),
+        AiAgent::new(AiDifficulty::Hard),
+    );
+
+    store.save_active(&app.match_state.saved_game()).unwrap();
+    let mut bytes = fs::read(&path).unwrap();
+    bytes[0] ^= 0x01;
+    fs::write(&path, bytes).unwrap();
+
+    let err = store.load_active().unwrap_err();
+    assert!(matches!(
+        err,
+        FileSaveError::Integrity(SaveIntegrityError::Header)
+    ));
+    cleanup_save_path(&path);
+}
+
+#[test]
+#[cfg(feature = "persistence")]
+fn file_save_store_rejects_unsupported_save_version() {
+    let path = test_save_path("tampered-version");
+    let mut store = FileSaveStore::new(&path);
+    store.clear_active().unwrap();
+    let app = BattleshipApp::new_local_ai(
+        AiAgent::new(AiDifficulty::Hard),
+        AiAgent::new(AiDifficulty::Hard),
+    );
+
+    store.save_active(&app.match_state.saved_game()).unwrap();
+    let mut bytes = fs::read(&path).unwrap();
+    bytes[4] = bytes[4].wrapping_add(1);
+    fs::write(&path, bytes).unwrap();
+
+    let err = store.load_active().unwrap_err();
+    assert!(matches!(
+        err,
+        FileSaveError::Integrity(SaveIntegrityError::Version)
+    ));
+    cleanup_save_path(&path);
+}
+
+#[test]
+#[cfg(feature = "persistence")]
+fn file_save_store_rejects_legacy_plain_bincode_save() {
+    let path = test_save_path("legacy-bincode");
+    let mut store = FileSaveStore::new(&path);
+    store.clear_active().unwrap();
+    let app = BattleshipApp::new_local_ai(
+        AiAgent::new(AiDifficulty::Hard),
+        AiAgent::new(AiDifficulty::Hard),
+    );
+    let legacy_bytes = bincode::serialize(&app.match_state.saved_game()).unwrap();
+    fs::write(&path, legacy_bytes).unwrap();
+
+    let err = store.load_active().unwrap_err();
+    assert!(matches!(
+        err,
+        FileSaveError::Integrity(SaveIntegrityError::Header)
+    ));
+    cleanup_save_path(&path);
+}
+
+#[test]
+#[cfg(feature = "persistence")]
 fn file_save_store_loads_missing_file_as_empty() {
     let path = test_save_path("missing");
     let mut store = FileSaveStore::new(&path);
@@ -131,4 +229,13 @@ fn test_save_path(name: &str) -> PathBuf {
         "battleship-{name}-{}-{nanos}.sav",
         std::process::id(),
     ))
+}
+
+#[cfg(feature = "persistence")]
+fn cleanup_save_path(path: &PathBuf) {
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+        Err(err) => panic!("failed to remove test save file: {err}"),
+    }
 }

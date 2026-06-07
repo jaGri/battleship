@@ -11,7 +11,10 @@ type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
 /// Serializable board state for syncing or saving games.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct BoardState {
     pub ship_states: [Ship<u128, { BOARD_SIZE as usize }>; NUM_SHIPS],
     pub ship_map: BB,

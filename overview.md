@@ -37,9 +37,11 @@ BattleshipApp
 
 `BattleshipApp` owns match orchestration. Agents choose placements or targets when requested; renderers receive passive `ScreenView` values; transports move `WireMessage` payloads; runners decide how to execute emitted `AppCommand` values. `TransportCommandRunner` provides the reusable bridge for app send commands, inbound transport messages, and connection state transitions.
 
-The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. It executes app save/load commands through a `FileSaveStore`, using `battleship.sav` in the current working directory as the active save. Network and embedded runners should compose the same app-facing traits and the transport command bridge instead of embedding game logic in transport or UI code.
+The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. It executes app save/load commands through a `FileSaveStore`, using `battleship.sav` in the current working directory as the active save. File-backed saves are integrity-protected with a keyed BLAKE3 envelope and are rejected before deserialization when the header, length, or MAC is invalid; save files are not encrypted. Network and embedded runners should compose the same app-facing traits and the transport command bridge instead of embedding game logic in transport or UI code.
 
 The active root crate no longer has a `src/interface` module. The `web` feature now exposes focused input and render adapters; the `websocket` feature remains a transport boundary for runners that bridge `WireMessage` values into `BattleshipApp`.
+
+The `ble` feature provides a disconnected adapter boundary plus bounded postcard frame helpers for `WireMessage`. Platform runners remain responsible for BLE connection state, pairing, link encryption, entropy, timestamps, and any remote auth or anti-cheat policy.
 
 ## Testing
 
@@ -47,7 +49,7 @@ The active test suite covers:
 
 - Engine, board, bitboard, and serialization round trips.
 - AI agent target selection and local app game completion.
-- App view generation, saved-game restoration, in-memory save stores, and file-backed active saves.
+- App view generation, saved-game restoration, in-memory save stores, file-backed active saves, and save integrity rejection.
 - In-memory nonblocking transport endpoint behavior and remote runner message exchange.
 - TCP framing, malformed frames, cross-version handshakes, fuzz cases, and transport resilience.
 
@@ -75,6 +77,6 @@ Legacy mixed-player and RPC tests were removed with the old architecture.
 ## Next Work
 
 - Split `std` dependencies more strictly so `std` means only standard-library support.
-- Expand WebSocket, BLE, and persistence backends beyond their adapter boundaries.
+- Expand WebSocket and BLE backends beyond their adapter boundaries.
 - Build concrete TCP/WebSocket/BLE runner UX around the existing transport command bridge.
 - Add renderer snapshots for CLI and future LCD/web renderers.

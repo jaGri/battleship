@@ -7,10 +7,16 @@ use crate::core::{BitBoard, GameStatus as CoreGameStatus, GuessBoardState, BOARD
 
 type BB = BitBoard<u128, { BOARD_SIZE as usize }>;
 
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Board {/* grid, ships, hits/misses */}
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Ship {
     pub name: String,
     pub sunk: bool,
@@ -18,7 +24,10 @@ pub struct Ship {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum GuessResult {
     Hit,
     Miss,
@@ -26,14 +35,20 @@ pub enum GuessResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum GameStatus {
     InProgress,
     Won,
     Lost,
 }
 
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncPayload {
     /// Complete game state for full synchronization
@@ -47,7 +62,10 @@ pub struct SyncPayload {
 /// Values are relative to the sender: `Local` is the sending app, and `Remote`
 /// is the connected peer. This keeps private sync payloads free of board state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum RemotePlayer {
     Local,
     Remote,
@@ -59,7 +77,10 @@ pub enum RemotePlayer {
 /// metadata. It must not include `BoardState`, ship placements, or complete
 /// `GameState` values.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(feature = "std", feature = "ble"),
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct RemoteSyncPayload {
     pub turn_number: u32,
     pub active_player: RemotePlayer,
