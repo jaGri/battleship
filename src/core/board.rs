@@ -209,6 +209,10 @@ impl From<BoardState> for Board {
                 Ship::<u128, { BOARD_SIZE as usize }>::from_state(&state.ship_states[i], def)
                     .unwrap()
             {
+                let mut ship = ship;
+                for (row, col) in state.hits.iter_set_bits() {
+                    ship.guess(row, col);
+                }
                 board.ships[i] = Some(ship);
             }
         }

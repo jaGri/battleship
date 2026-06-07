@@ -1,10 +1,8 @@
-#![cfg(feature = "std")]
-
-use tokio::net::{TcpStream, ToSocketAddrs};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::time::{timeout, Duration, Instant};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::time::{timeout, Duration, Instant};
 
 use crate::protocol::{WireMessage, PROTOCOL_VERSION};
 use crate::transport::Transport;
@@ -36,7 +34,7 @@ pub struct TcpTransport {
 #[cfg(feature = "std")]
 impl TcpTransport {
     pub fn new(stream: TcpStream) -> Self {
-        Self { 
+        Self {
             stream,
             timeout_duration: DEFAULT_TIMEOUT,
             max_message_size: MAX_MESSAGE_SIZE,
@@ -60,7 +58,7 @@ impl TcpTransport {
     }
 
     pub fn with_config(
-        stream: TcpStream, 
+        stream: TcpStream,
         timeout_duration: Duration,
         max_message_size: u32,
         heartbeat_interval: Duration,
@@ -102,8 +100,10 @@ impl TcpTransport {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
-        
-        let heartbeat = WireMessage::Heartbeat { version: PROTOCOL_VERSION };
+
+        let heartbeat = WireMessage::Heartbeat {
+            version: PROTOCOL_VERSION,
+        };
         self.send(heartbeat).await
     }
 
@@ -120,56 +120,56 @@ impl Transport for TcpTransport {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
-        
+
         if self.is_idle_timeout() {
             return Err(anyhow::anyhow!("Connection idle timeout exceeded"));
         }
-        
+
         let send_op = async {
             let data = bincode::serialize(&msg)
                 .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
-            
+
             // Check if serialized message exceeds max size
             if data.len() as u32 > self.max_message_size {
                 return Err(anyhow::anyhow!(
-                    "Message too large: {} bytes (max: {})", 
-                    data.len(), 
+                    "Message too large: {} bytes (max: {})",
+                    data.len(),
                     self.max_message_size
                 ));
             }
-            
+
             let len = (data.len() as u32).to_be_bytes();
-            self.stream.write_all(&len).await
-                .map_err(|e| {
-                    if e.kind() == std::io::ErrorKind::BrokenPipe 
-                        || e.kind() == std::io::ErrorKind::ConnectionReset {
-                        anyhow::anyhow!("Connection closed by peer")
-                    } else {
-                        anyhow::anyhow!("Write error: {}", e)
-                    }
-                })?;
-            
-            self.stream.write_all(&data).await
-                .map_err(|e| {
-                    if e.kind() == std::io::ErrorKind::BrokenPipe 
-                        || e.kind() == std::io::ErrorKind::ConnectionReset {
-                        anyhow::anyhow!("Connection closed by peer")
-                    } else {
-                        anyhow::anyhow!("Write error: {}", e)
-                    }
-                })?;
-            
+            self.stream.write_all(&len).await.map_err(|e| {
+                if e.kind() == std::io::ErrorKind::BrokenPipe
+                    || e.kind() == std::io::ErrorKind::ConnectionReset
+                {
+                    anyhow::anyhow!("Connection closed by peer")
+                } else {
+                    anyhow::anyhow!("Write error: {}", e)
+                }
+            })?;
+
+            self.stream.write_all(&data).await.map_err(|e| {
+                if e.kind() == std::io::ErrorKind::BrokenPipe
+                    || e.kind() == std::io::ErrorKind::ConnectionReset
+                {
+                    anyhow::anyhow!("Connection closed by peer")
+                } else {
+                    anyhow::anyhow!("Write error: {}", e)
+                }
+            })?;
+
             anyhow::Ok(())
         };
-        
+
         let result = timeout(self.timeout_duration, send_op)
             .await
             .map_err(|_| anyhow::anyhow!("Send timeout after {:?}", self.timeout_duration))?;
-        
+
         if result.is_ok() {
             self.mark_activity();
         }
-        
+
         result
     }
 
@@ -177,65 +177,63 @@ impl Transport for TcpTransport {
         if self.is_shutdown() {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
-        
+
         if self.is_idle_timeout() {
             return Err(anyhow::anyhow!("Connection idle timeout exceeded"));
         }
-        
+
         let recv_op = async {
             let mut len_buf = [0u8; 4];
-            self.stream.read_exact(&mut len_buf).await
-                .map_err(|e| {
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        anyhow::anyhow!("Connection closed by peer")
-                    } else if e.kind() == std::io::ErrorKind::ConnectionReset {
-                        anyhow::anyhow!("Connection reset by peer")
-                    } else {
-                        anyhow::anyhow!("Read error: {}", e)
-                    }
-                })?;
-            
+            self.stream.read_exact(&mut len_buf).await.map_err(|e| {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    anyhow::anyhow!("Connection closed by peer")
+                } else if e.kind() == std::io::ErrorKind::ConnectionReset {
+                    anyhow::anyhow!("Connection reset by peer")
+                } else {
+                    anyhow::anyhow!("Read error: {}", e)
+                }
+            })?;
+
             let len = u32::from_be_bytes(len_buf);
-            
+
             // Bounded read length check to prevent excessive memory allocation
             if len > self.max_message_size {
                 return Err(anyhow::anyhow!(
-                    "Message too large: {} bytes (max: {})", 
-                    len, 
+                    "Message too large: {} bytes (max: {})",
+                    len,
                     self.max_message_size
                 ));
             }
-            
+
             if len == 0 {
                 return Err(anyhow::anyhow!("Invalid message length: 0"));
             }
-            
+
             let mut buf = vec![0u8; len as usize];
-            self.stream.read_exact(&mut buf).await
-                .map_err(|e| {
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        anyhow::anyhow!("Connection closed by peer")
-                    } else if e.kind() == std::io::ErrorKind::ConnectionReset {
-                        anyhow::anyhow!("Connection reset by peer")
-                    } else {
-                        anyhow::anyhow!("Read error: {}", e)
-                    }
-                })?;
-            
+            self.stream.read_exact(&mut buf).await.map_err(|e| {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    anyhow::anyhow!("Connection closed by peer")
+                } else if e.kind() == std::io::ErrorKind::ConnectionReset {
+                    anyhow::anyhow!("Connection reset by peer")
+                } else {
+                    anyhow::anyhow!("Read error: {}", e)
+                }
+            })?;
+
             let msg = bincode::deserialize(&buf)
                 .map_err(|e| anyhow::anyhow!("Deserialization error: {}", e))?;
-            
+
             anyhow::Ok(msg)
         };
-        
+
         let result = timeout(self.timeout_duration, recv_op)
             .await
             .map_err(|_| anyhow::anyhow!("Receive timeout after {:?}", self.timeout_duration))?;
-        
+
         if result.is_ok() {
             self.mark_activity();
         }
-        
+
         result
     }
 }

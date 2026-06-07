@@ -1,8 +1,6 @@
-#![cfg(feature = "std")]
-
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use tokio::task::yield_now;
 use tokio::time::{sleep, Duration};
@@ -35,7 +33,7 @@ impl InMemoryTransport {
     pub fn pair() -> (Self, Self) {
         let state1 = Arc::new(Mutex::new(SharedState::new()));
         let state2 = Arc::new(Mutex::new(SharedState::new()));
-        
+
         (
             Self {
                 recv_state: state1.clone(),
@@ -53,7 +51,7 @@ impl InMemoryTransport {
     /// Request graceful shutdown of the transport.
     pub fn shutdown(&self) {
         self.shutdown.store(true, Ordering::SeqCst);
-        
+
         // Mark send channel as closed so peer can detect it
         if let Ok(mut state) = self.send_state.lock() {
             state.closed = true;
@@ -116,13 +114,15 @@ impl Transport for InMemoryTransport {
             return Err(anyhow::anyhow!("Transport is shut down"));
         }
 
-        let mut state = self.send_state.lock()
+        let mut state = self
+            .send_state
+            .lock()
             .map_err(|_| anyhow::anyhow!("Failed to acquire send lock"))?;
-        
+
         if state.closed {
             return Err(anyhow::anyhow!("Channel closed by peer"));
         }
-        
+
         state.queue.push_back(msg);
         Ok(())
     }
@@ -135,7 +135,7 @@ impl Transport for InMemoryTransport {
         // Poll with exponential backoff to reduce CPU usage
         let mut backoff_ms = 1;
         let max_backoff_ms = 100;
-        
+
         loop {
             // Check for early channel closure detection
             if self.is_peer_closed() {
@@ -144,14 +144,16 @@ impl Transport for InMemoryTransport {
 
             // Try to receive a message
             let msg_opt = {
-                let mut state = self.recv_state.lock()
+                let mut state = self
+                    .recv_state
+                    .lock()
                     .map_err(|_| anyhow::anyhow!("Failed to acquire receive lock"))?;
-                
+
                 // Double-check closed state under lock
                 if state.closed && state.queue.is_empty() {
                     return Err(anyhow::anyhow!("Channel closed by peer"));
                 }
-                
+
                 state.queue.pop_front()
             };
 

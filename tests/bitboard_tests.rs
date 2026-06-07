@@ -28,7 +28,7 @@ fn test_get_set_toggle() {
 
 #[test]
 fn test_from_iter_and_iter() {
-    let bb = BitBoard::<u16, 4>::from_iter([(0,1), (3,3)]).unwrap();
+    let bb = BitBoard::<u16, 4>::from_iter([(0, 1), (3, 3)]).unwrap();
     let bits: Vec<_> = bb.iter_set_bits().collect();
-    assert_eq!(bits, vec![(0,1), (3,3)]);
+    assert_eq!(bits, vec![(0, 1), (3, 3)]);
 }

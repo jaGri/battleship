@@ -20,7 +20,10 @@ pub type Coordinate = (usize, usize);
 
 /// Difficulty level for AI agents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(clap::ValueEnum, serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "std",
+    derive(clap::ValueEnum, serde::Serialize, serde::Deserialize)
+)]
 pub enum AiDifficulty {
     Easy,
     Medium,
@@ -55,7 +58,9 @@ pub enum GameEvent {
 
 /// Requests made by the app when it needs a player decision.
 pub enum AgentRequest<'a> {
-    PlaceShips { board: &'a Board },
+    PlaceShips {
+        board: &'a Board,
+    },
     SelectTarget {
         guess_board: &'a GuessBoard,
         remaining_ships: &'a [usize],
@@ -136,11 +141,7 @@ impl AiAgent {
         self
     }
 
-    pub fn place_ships(
-        &mut self,
-        rng: &mut SmallRng,
-        board: &mut Board,
-    ) -> Result<(), BoardError> {
+    pub fn place_ships(&mut self, rng: &mut SmallRng, board: &mut Board) -> Result<(), BoardError> {
         for i in 0..NUM_SHIPS as usize {
             let (r, c, o) = board.random_placement(rng, i)?;
             board.place(i, r, c, o)?;
@@ -170,8 +171,15 @@ impl AiAgent {
             self.temperature,
             self.hit_weight,
         );
-        self.last_guess = Some(guess);
-        guess
+        let target = if guess_board.hits.get(guess.0, guess.1).unwrap_or(false)
+            || guess_board.misses.get(guess.0, guess.1).unwrap_or(false)
+        {
+            first_unguessed(guess_board).unwrap_or(guess)
+        } else {
+            guess
+        };
+        self.last_guess = Some(target);
+        target
     }
 
     fn handle_guess_result(&mut self, coord: Coordinate, result: GuessResult) {
@@ -262,6 +270,19 @@ impl AiAgent {
     }
 }
 
+fn first_unguessed(guess_board: &GuessBoard) -> Option<Coordinate> {
+    for row in 0..BOARD_SIZE as usize {
+        for col in 0..BOARD_SIZE as usize {
+            if !guess_board.hits.get(row, col).unwrap_or(false)
+                && !guess_board.misses.get(row, col).unwrap_or(false)
+            {
+                return Some((row, col));
+            }
+        }
+    }
+    None
+}
+
 impl Default for AiAgent {
     fn default() -> Self {
         Self::new(AiDifficulty::Hard)
@@ -298,9 +319,11 @@ impl PlayerAgent for AiAgent {
             AgentRequest::SelectTarget {
                 guess_board,
                 remaining_ships,
-            } => Ok(AgentAction::Fire(
-                self.select_target(rng, guess_board, remaining_ships),
-            )),
+            } => Ok(AgentAction::Fire(self.select_target(
+                rng,
+                guess_board,
+                remaining_ships,
+            ))),
             AgentRequest::Observe(GameEvent::GuessResult {
                 coord,
                 result,

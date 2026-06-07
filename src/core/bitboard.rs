@@ -118,7 +118,7 @@ where
         self.check_bounds(row, col)?;
         let idx = row * N + col;
         self.bits = self.bits ^ (T::one() << idx);
-        Ok(())  
+        Ok(())
     }
 
     /// Sets all board bits to `1`.

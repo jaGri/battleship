@@ -47,4 +47,3 @@ proptest! {
         prop_assert_ne!(state_before, state_after);
     }
 }
-

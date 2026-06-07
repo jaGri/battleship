@@ -1,66 +1,64 @@
-use battleship::protocol::Message;
-use battleship::domain::{GuessResult, GameStatus, Ship, SyncPayload};
-use battleship::{GameState, GuessBoardState, BoardState, BitBoard, ShipState};
+#![cfg(feature = "std")]
+
+use battleship::domain::{GameStatus, GuessResult, Ship, SyncPayload};
+use battleship::protocol::WireMessage;
+use battleship::{BitBoard, BoardState, GameState, GuessBoardState, ShipState};
 use proptest::prelude::*;
 
 /// Generate arbitrary messages for fuzzing
-fn arb_message() -> impl Strategy<Value = Message> {
+fn arb_message() -> impl Strategy<Value = WireMessage> {
     prop_oneof![
-        (any::<u8>()).prop_map(|v| Message::Handshake { version: v }),
-        (any::<u8>()).prop_map(|v| Message::HandshakeAck { version: v }),
+        (any::<u8>()).prop_map(|v| WireMessage::Handshake { version: v }),
+        (any::<u8>()).prop_map(|v| WireMessage::HandshakeAck { version: v }),
         (any::<u8>(), any::<u64>(), any::<u8>(), any::<u8>()).prop_map(|(v, s, x, y)| {
-            Message::Guess {
+            WireMessage::Guess {
                 version: v,
                 seq: s,
                 x,
                 y,
             }
         }),
-        (any::<u8>(), any::<u64>()).prop_map(|(v, s)| Message::StatusReq {
-            version: v,
-            seq: s,
-        }),
+        (any::<u8>(), any::<u64>())
+            .prop_map(|(v, s)| WireMessage::StatusReq { version: v, seq: s }),
         (any::<u8>(), any::<u64>(), arb_guess_result()).prop_map(|(v, s, res)| {
-            Message::StatusResp {
+            WireMessage::StatusResp {
                 version: v,
                 seq: s,
                 res,
             }
         }),
         (any::<u8>(), any::<u64>(), arb_sync_payload()).prop_map(|(v, s, payload)| {
-            Message::Sync {
+            WireMessage::Sync {
                 version: v,
                 seq: s,
                 payload,
             }
         }),
         (any::<u8>(), any::<u64>(), any::<usize>()).prop_map(|(v, s, id)| {
-            Message::ShipStatusReq {
+            WireMessage::ShipStatusReq {
                 version: v,
                 seq: s,
                 id,
             }
         }),
         (any::<u8>(), any::<u64>(), arb_ship()).prop_map(|(v, s, ship)| {
-            Message::ShipStatusResp {
+            WireMessage::ShipStatusResp {
                 version: v,
                 seq: s,
                 ship,
             }
         }),
-        (any::<u8>(), any::<u64>()).prop_map(|(v, s)| Message::GameStatusReq {
-            version: v,
-            seq: s,
-        }),
+        (any::<u8>(), any::<u64>())
+            .prop_map(|(v, s)| WireMessage::GameStatusReq { version: v, seq: s }),
         (any::<u8>(), any::<u64>(), arb_game_status()).prop_map(|(v, s, status)| {
-            Message::GameStatusResp {
+            WireMessage::GameStatusResp {
                 version: v,
                 seq: s,
                 status,
             }
         }),
-        (any::<u8>(), any::<u64>()).prop_map(|(v, s)| Message::Ack { version: v, seq: s }),
-        (any::<u8>()).prop_map(|v| Message::Heartbeat { version: v }),
+        (any::<u8>(), any::<u64>()).prop_map(|(v, s)| WireMessage::Ack { version: v, seq: s }),
+        (any::<u8>()).prop_map(|v| WireMessage::Heartbeat { version: v }),
     ]
 }
 
@@ -86,7 +84,14 @@ fn arb_ship() -> impl Strategy<Value = Ship> {
         any::<bool>(),
         prop_oneof![
             Just(None),
-            (any::<u8>(), any::<u8>(), prop_oneof![Just(battleship::Orientation::Horizontal), Just(battleship::Orientation::Vertical)])
+            (
+                any::<u8>(),
+                any::<u8>(),
+                prop_oneof![
+                    Just(battleship::Orientation::Horizontal),
+                    Just(battleship::Orientation::Vertical)
+                ]
+            )
                 .prop_map(|(r, c, o)| Some((r, c, o)))
         ],
     )
@@ -113,12 +118,14 @@ fn arb_game_state() -> impl Strategy<Value = GameState> {
         any::<[bool; 5]>(),
         any::<usize>(),
     )
-        .prop_map(|(my_board, my_guesses, enemy_ships_remaining, enemy_remaining)| GameState {
-            my_board,
-            my_guesses,
-            enemy_ships_remaining,
-            enemy_remaining,
-        })
+        .prop_map(
+            |(my_board, my_guesses, enemy_ships_remaining, enemy_remaining)| GameState {
+                my_board,
+                my_guesses,
+                enemy_ships_remaining,
+                enemy_remaining,
+            },
+        )
 }
 
 fn arb_board_state() -> impl Strategy<Value = BoardState> {
@@ -148,7 +155,14 @@ fn arb_ship_state() -> impl Strategy<Value = ShipState> {
         any::<bool>(),
         prop_oneof![
             Just(None),
-            (any::<usize>(), any::<usize>(), prop_oneof![Just(battleship::Orientation::Horizontal), Just(battleship::Orientation::Vertical)])
+            (
+                any::<usize>(),
+                any::<usize>(),
+                prop_oneof![
+                    Just(battleship::Orientation::Horizontal),
+                    Just(battleship::Orientation::Vertical)
+                ]
+            )
                 .prop_map(|(r, c, o)| Some((r, c, o)))
         ],
     )
@@ -171,14 +185,14 @@ fn arb_guess_board_state() -> impl Strategy<Value = GuessBoardState> {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
 
-    /// Fuzz test: any message should serialize and deserialize without panic
+    /// Fuzz test: any WireMessage should serialize and deserialize without panic
     #[test]
     fn fuzz_message_serialization(msg in arb_message()) {
         let serialized = bincode::serialize(&msg);
         prop_assert!(serialized.is_ok());
-        
+
         if let Ok(bytes) = serialized {
-            let deserialized: Result<Message, _> = bincode::deserialize(&bytes);
+            let deserialized: Result<WireMessage, _> = bincode::deserialize(&bytes);
             // Should either succeed or fail gracefully
             match deserialized {
                 Ok(_) => {
@@ -194,7 +208,7 @@ proptest! {
     /// Fuzz test: arbitrary byte sequences should not crash deserializer
     #[test]
     fn fuzz_arbitrary_bytes(bytes in prop::collection::vec(any::<u8>(), 0..1000)) {
-        let result: Result<Message, _> = bincode::deserialize(&bytes);
+        let result: Result<WireMessage, _> = bincode::deserialize(&bytes);
         // Should not panic, just return Ok or Err
         let _ = result;
     }
@@ -204,7 +218,7 @@ proptest! {
     fn fuzz_sync_payload(payload in arb_sync_payload()) {
         let serialized = bincode::serialize(&payload);
         prop_assert!(serialized.is_ok());
-        
+
         if let Ok(bytes) = serialized {
             let deserialized: Result<SyncPayload, _> = bincode::deserialize(&bytes);
             if let Ok(restored) = deserialized {
@@ -219,7 +233,7 @@ proptest! {
     fn fuzz_game_state(state in arb_game_state()) {
         let serialized = bincode::serialize(&state);
         prop_assert!(serialized.is_ok());
-        
+
         if let Ok(bytes) = serialized {
             let deserialized: Result<GameState, _> = bincode::deserialize(&bytes);
             if let Ok(restored) = deserialized {
@@ -237,12 +251,12 @@ proptest! {
         name in prop::collection::vec(any::<u8>(), 1000..10000)
     ) {
         let large_name = String::from_utf8_lossy(&name).to_string();
-        let msg = Message::StatusResp {
+        let msg = WireMessage::StatusResp {
             version,
             seq,
             res: GuessResult::Sink(large_name),
         };
-        
+
         let serialized = bincode::serialize(&msg);
         prop_assert!(serialized.is_ok());
     }
@@ -255,18 +269,18 @@ proptest! {
         x in any::<u8>(),
         y in any::<u8>()
     ) {
-        let msg = Message::Guess {
+        let msg = WireMessage::Guess {
             version,
             seq,
             x,
             y,
         };
-        
+
         let serialized = bincode::serialize(&msg);
         prop_assert!(serialized.is_ok());
-        
+
         if let Ok(bytes) = serialized {
-            let deserialized: Result<Message, _> = bincode::deserialize(&bytes);
+            let deserialized: Result<WireMessage, _> = bincode::deserialize(&bytes);
             prop_assert!(deserialized.is_ok());
         }
     }
@@ -274,19 +288,19 @@ proptest! {
     /// Fuzz test: sequence number overflow
     #[test]
     fn fuzz_seq_overflow(seq in any::<u64>()) {
-        let msg = Message::Guess {
+        let msg = WireMessage::Guess {
             version: 1,
             seq,
             x: 0,
             y: 0,
         };
-        
+
         let serialized = bincode::serialize(&msg);
         prop_assert!(serialized.is_ok());
-        
+
         if let Ok(bytes) = serialized {
-            let deserialized: Result<Message, _> = bincode::deserialize(&bytes);
-            if let Ok(Message::Guess { seq: restored_seq, .. }) = deserialized {
+            let deserialized: Result<WireMessage, _> = bincode::deserialize(&bytes);
+            if let Ok(WireMessage::Guess { seq: restored_seq, .. }) = deserialized {
                 prop_assert_eq!(seq, restored_seq);
             }
         }
@@ -300,7 +314,7 @@ proptest! {
     ) {
         if let Ok(bytes) = bincode::serialize(&msg) {
             let truncated = &bytes[..truncate_at.min(bytes.len())];
-            let result: Result<Message, _> = bincode::deserialize(truncated);
+            let result: Result<WireMessage, _> = bincode::deserialize(truncated);
             // Should fail gracefully, not panic
             let _ = result;
         }
@@ -316,7 +330,7 @@ proptest! {
         if let Ok(mut bytes) = bincode::serialize(&msg) {
             if corrupt_idx < bytes.len() {
                 bytes[corrupt_idx] = corrupt_byte;
-                let result: Result<Message, _> = bincode::deserialize(&bytes);
+                let result: Result<WireMessage, _> = bincode::deserialize(&bytes);
                 // Should fail gracefully, not panic
                 let _ = result;
             }
@@ -329,7 +343,7 @@ proptest! {
         let bb = BitBoard::<u128, 10>::from_raw(bits);
         let serialized = bincode::serialize(&bb);
         prop_assert!(serialized.is_ok());
-        
+
         if let Ok(bytes) = serialized {
             let deserialized: Result<BitBoard<u128, 10>, _> = bincode::deserialize(&bytes);
             if let Ok(restored) = deserialized {
@@ -342,32 +356,34 @@ proptest! {
 #[test]
 fn test_specific_malformed_patterns() {
     // Test specific byte patterns known to be problematic
-    
+
     // All zeros
     let all_zeros = vec![0u8; 100];
-    let result: Result<Message, _> = bincode::deserialize(&all_zeros);
+    let result: Result<WireMessage, _> = bincode::deserialize(&all_zeros);
     assert!(result.is_err() || result.is_ok()); // Should not panic
-    
+
     // All 0xFF
     let all_ff = vec![0xFFu8; 100];
-    let result: Result<Message, _> = bincode::deserialize(&all_ff);
+    let result: Result<WireMessage, _> = bincode::deserialize(&all_ff);
     assert!(result.is_err() || result.is_ok());
-    
+
     // Alternating pattern
-    let alternating: Vec<u8> = (0..100).map(|i| if i % 2 == 0 { 0xAA } else { 0x55 }).collect();
-    let result: Result<Message, _> = bincode::deserialize(&alternating);
+    let alternating: Vec<u8> = (0..100)
+        .map(|i| if i % 2 == 0 { 0xAA } else { 0x55 })
+        .collect();
+    let result: Result<WireMessage, _> = bincode::deserialize(&alternating);
     assert!(result.is_err() || result.is_ok());
-    
+
     // Random-ish pattern
     let pattern = vec![0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE];
-    let result: Result<Message, _> = bincode::deserialize(&pattern);
+    let result: Result<WireMessage, _> = bincode::deserialize(&pattern);
     assert!(result.is_err() || result.is_ok());
 }
 
 #[test]
 fn test_empty_frame() {
     let empty = vec![];
-    let result: Result<Message, _> = bincode::deserialize(&empty);
+    let result: Result<WireMessage, _> = bincode::deserialize(&empty);
     assert!(result.is_err());
 }
 
@@ -375,7 +391,7 @@ fn test_empty_frame() {
 fn test_single_byte_frame() {
     for byte in 0..=255u8 {
         let single = vec![byte];
-        let result: Result<Message, _> = bincode::deserialize(&single);
+        let result: Result<WireMessage, _> = bincode::deserialize(&single);
         // Should not panic
         let _ = result;
     }

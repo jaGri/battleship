@@ -12,9 +12,7 @@ pub mod core;
 pub use crate::core as engine;
 
 // Convenience re-exports of core types
-pub use engine::{
-    ai::*, bitboard::*, board::*, common::*, config::*, game::*, ship::*,
-};
+pub use engine::{ai::*, bitboard::*, board::*, common::*, config::*, game::*, ship::*};
 
 // ========================================
 // Layer 2: App adapters & Transport
@@ -32,19 +30,21 @@ pub use agent::{
 };
 pub use app::{AppCommand, AppEvent, AppState, BattleshipApp, MatchState, SavedGame};
 pub use input::{InputSource, UiEvent};
-pub use render::{Renderer, ScreenView};
 #[cfg(feature = "persistence")]
-pub use persistence::{AdapterState, AgentSnapshot, SaveStore, UiSnapshot};
+pub use persistence::{AdapterState, AgentSnapshot, MemorySaveStore, SaveStore, UiSnapshot};
+pub use render::{Renderer, ScreenView};
 
 #[cfg(feature = "std")]
 pub use render_cli::{CliInput, CliRenderer};
 
 pub mod transport;
 
-#[cfg(feature = "tcp")]
-pub use transport::tcp::TcpTransport;
 #[cfg(feature = "std")]
 pub use transport::heartbeat::HeartbeatTransport;
+#[cfg(feature = "in-memory")]
+pub use transport::in_memory::InMemoryTransport;
+#[cfg(feature = "tcp")]
+pub use transport::tcp::TcpTransport;
 
 #[cfg(feature = "persistence")]
 pub mod persistence;
@@ -57,7 +57,4 @@ pub mod data_generation;
 // ========================================
 pub mod protocol;
 
-pub use protocol::{domain, Message, PROTOCOL_VERSION, WireMessage};
-#[cfg(feature = "std")]
-pub use protocol::{GameApi, Skeleton, Stub};
-
+pub use protocol::{domain, WireMessage, PROTOCOL_VERSION};

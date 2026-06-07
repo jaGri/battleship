@@ -321,7 +321,9 @@ where
             result,
             by_local_player,
         };
-        let _ = self.local_agent.handle_request(AgentRequest::Observe(event), rng);
+        let _ = self
+            .local_agent
+            .handle_request(AgentRequest::Observe(event), rng);
         let _ = self
             .opponent_agent
             .handle_request(AgentRequest::Observe(event), rng);
@@ -350,7 +352,9 @@ where
             orientation,
         } in placements
         {
-            engine.board_mut().place(ship_index, row, col, orientation)?;
+            engine
+                .board_mut()
+                .place(ship_index, row, col, orientation)?;
         }
         Ok(())
     }

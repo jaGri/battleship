@@ -59,12 +59,14 @@ impl InputSource for CliInput {
             return Ok(None);
         }
 
-        Self::parse_coord(trimmed).map(|coord| Some(UiEvent::Target(coord))).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("invalid coordinate: {}", trimmed),
-            )
-        })
+        Self::parse_coord(trimmed)
+            .map(|coord| Some(UiEvent::Target(coord)))
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("invalid coordinate: {}", trimmed),
+                )
+            })
     }
 }
 

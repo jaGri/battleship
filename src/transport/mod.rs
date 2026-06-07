@@ -16,13 +16,13 @@ pub trait Transport: Send + Sync {
     async fn recv(&mut self) -> anyhow::Result<WireMessage>;
 }
 
+#[cfg(feature = "ble")]
+pub mod ble;
 #[cfg(feature = "std")]
-pub mod tcp;
+pub mod heartbeat;
 #[cfg(feature = "std")]
 pub mod in_memory;
 #[cfg(feature = "std")]
-pub mod heartbeat;
+pub mod tcp;
 #[cfg(feature = "websocket")]
 pub mod websocket;
-#[cfg(feature = "ble")]
-pub mod ble;

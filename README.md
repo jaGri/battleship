@@ -1,67 +1,42 @@
 # Battleship
 
-Rust implementation of the classic Battleship game with support for AI opponents, a command-line interface, and networked play.
+Rust Battleship implementation with a no_std-compatible rules engine and adapter-based app architecture for AI, CLI, transport, rendering, and persistence experiments.
 
-## Module layout
+## Module Layout
 
-The crate is split into modules that expose game logic and optional transports:
-
-- `ai`: probability-based target selection.
-- `bitboard`: efficient bitboard representation of the game grid.
-- `board`: manages ship placement and guesses.
-- `common`: shared enums such as errors and guess results.
-- `config`: utilities like ship naming helpers.
-- `domain`: public types for boards, ships, and game status.
-- `game`: core game engine.
-- `player`: trait defining player behaviour.
-- `player_ai`: AI player implementation.
-- `player_cli`: interactive CLI player (requires `std`).
-- `player_node`: wrapper for running a player as a network node.
-- `protocol`: messages exchanged between components.
-- `ship`: ship definitions and logic.
-- `skeleton`: sample network client (requires `std`).
-- `stub`: protocol stub for testing (requires `std`).
-- `transport`: transport implementations such as TCP or in-memory (requires `std`).
-
-### Module graph
-
-```mermaid
-flowchart TD
-    battleship --> ai
-    battleship --> bitboard
-    battleship --> board
-    battleship --> common
-    battleship --> config
-    battleship --> domain
-    battleship --> game
-    battleship --> player
-    battleship --> player_ai
-    battleship --> player_cli
-    battleship --> player_node
-    battleship --> protocol
-    battleship --> ship
-    battleship --> skeleton
-    battleship --> stub
-    battleship --> transport
-```
+- `engine`: board, bitboard, ship, and game rules.
+- `agent`: AI, human, remote, and scripted decision makers.
+- `app`: `BattleshipApp`, match state, app events, and runner commands.
+- `input`: platform-neutral UI events.
+- `render`: passive screen views and renderer trait.
+- `render_cli`: CLI input and rendering adapters.
+- `protocol`: versioned `WireMessage` payloads.
+- `transport`: nonblocking app endpoint plus TCP, heartbeat, in-memory, WebSocket, and BLE boundaries.
+- `persistence`: saved-game snapshots and `SaveStore`.
+- `data_generation`: optional AI simulation data boundary.
 
 ## Commands
 
-Build the project:
+Build:
 
 ```bash
 cargo build
 ```
 
-Run the game:
+Run a local AI-vs-AI simulation:
 
 ```bash
-cargo run
+cargo run -- --seed 123 --difficulty hard
 ```
 
-Execute the tests:
+Run tests:
 
 ```bash
-cargo test
+cargo test --all-features
 ```
 
+Check no_std compatibility:
+
+```bash
+cargo check --no-default-features
+```

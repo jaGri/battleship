@@ -33,7 +33,8 @@ pub enum BoardError {
     // Ship out of bounds
     ShipOutOfBounds,
     /// Unknown ship hit (should not happen if all ships are placed correctly).
-    UnknownShipHit,}
+    UnknownShipHit,
+}
 
 impl From<BitBoardError> for BoardError {
     fn from(err: BitBoardError) -> Self {

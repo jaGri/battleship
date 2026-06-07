@@ -22,7 +22,6 @@ postcard = { version = "1.0", default-features = false, features = ["alloc"], op
 log = { version = "0.4", optional = true }
 env_logger = { version = "0.10", optional = true }
 blake3 = { version = "1.5", optional = true }
-rusqlite = { version = "0.29", features = ["bundled"], optional = true }
 uuid = { version = "1.5", features = ["v4", "serde"], optional = true }
 futures = { version = "0.3", optional = true }
 bindgen = { version = "0.69", optional = true }
@@ -40,7 +39,7 @@ ai = []
 tcp = ["std"]
 in-memory = ["std"]
 logging = ["log", "env_logger"]
-persistence = ["std", "blake3", "rusqlite", "uuid", "futures", "heapless", "seahash"]
+persistence = ["std", "blake3", "uuid", "futures", "heapless", "seahash"]
 websocket = ["std", "tokio-tungstenite", "tungstenite", "serde_json", "futures-util"]
 web = ["websocket"]
 ble = ["heapless", "postcard"]

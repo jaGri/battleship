@@ -1,50 +1,29 @@
-use battleship::{AiPlayer, GameEngine, GameStatus, Player};
+use battleship::{AiAgent, AiDifficulty, AppState, BattleshipApp, GameStatus};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 #[test]
-fn test_ai_vs_ai_game() {
-    let mut rng = SmallRng::seed_from_u64(123);
-    let mut p1 = AiPlayer::new();
-    let mut p2 = AiPlayer::new();
-    let mut e1 = GameEngine::new();
-    let mut e2 = GameEngine::new();
-    p1.place_ships(&mut rng, e1.board_mut()).unwrap();
-    p2.place_ships(&mut rng, e2.board_mut()).unwrap();
+fn ai_agents_complete_a_local_app_game() {
+    let mut rng1 = SmallRng::seed_from_u64(123);
+    let mut rng2 = SmallRng::seed_from_u64(456);
+    let mut app = BattleshipApp::new_local_ai(
+        AiAgent::new(AiDifficulty::Hard),
+        AiAgent::new(AiDifficulty::Hard),
+    );
 
-    let mut turns = 0;
-    loop {
-        turns += 1;
-        // p1 turn
-        let guess = p1.select_target(
-            &mut rng,
-            &e1.guess_hits(),
-            &e1.guess_misses(),
-            &e1.enemy_ship_lengths_remaining(),
-        );
-        let res = e2.opponent_guess(guess.0, guess.1).unwrap();
-        e1.record_guess(guess.0, guess.1, res).unwrap();
-        p1.handle_guess_result(guess, res);
-        if e2.status() == GameStatus::Lost {
+    app.place_ships(&mut rng1, &mut rng2).unwrap();
+    assert_eq!(app.state, AppState::Playing);
+
+    for _ in 0..300 {
+        if app.state == AppState::GameOver {
             break;
         }
-        // p2 turn
-        let guess = p2.select_target(
-            &mut rng,
-            &e2.guess_hits(),
-            &e2.guess_misses(),
-            &e2.enemy_ship_lengths_remaining(),
-        );
-        let res = e1.opponent_guess(guess.0, guess.1).unwrap();
-        e2.record_guess(guess.0, guess.1, res).unwrap();
-        p2.handle_guess_result(guess, res);
-        if e1.status() == GameStatus::Lost {
-            break;
-        }
-        if turns > 200 {
-            panic!("game took too many turns");
-        }
+        app.play_next_turn(&mut rng1, &mut rng2).unwrap();
     }
-    assert!(matches!(e1.status(), GameStatus::Won | GameStatus::Lost));
-    assert!(matches!(e2.status(), GameStatus::Won | GameStatus::Lost));
+
+    assert_eq!(app.state, AppState::GameOver);
+    assert!(matches!(
+        app.match_state.local_engine.status(),
+        GameStatus::Won | GameStatus::Lost
+    ));
 }

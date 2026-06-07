@@ -1,10 +1,8 @@
-#![cfg(feature = "std")]
-
-use tokio::time::{interval, Duration, Instant};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use crate::protocol::{WireMessage, PROTOCOL_VERSION};
 use crate::transport::Transport;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tokio::time::{interval, Duration, Instant};
 
 /// Transport wrapper that adds active heartbeat monitoring and idle connection detection.
 ///

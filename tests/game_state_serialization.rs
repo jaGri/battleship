@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use battleship::{GameEngine, GameState, NUM_SHIPS};
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
