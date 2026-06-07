@@ -16,6 +16,52 @@ pub struct GuessBoardState {
     pub misses: BB,
 }
 
+/// Passive view of guesses made against an opponent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+pub struct GuessBoard {
+    pub hits: BB,
+    pub misses: BB,
+    pub active_hits: BB,
+}
+
+impl GuessBoard {
+    /// Create an empty guess board.
+    pub fn new() -> Self {
+        Self {
+            hits: BB::new(),
+            misses: BB::new(),
+            active_hits: BB::new(),
+        }
+    }
+
+    /// Build a guess board from a game engine.
+    pub fn from_engine(engine: &GameEngine) -> Self {
+        Self {
+            hits: engine.guess_hits(),
+            misses: engine.guess_misses(),
+            active_hits: engine.active_hits(),
+        }
+    }
+
+    /// Get a cell state: `Some(true)` for hit, `Some(false)` for miss, `None` for unknown.
+    pub fn get_cell(&self, row: usize, col: usize) -> Option<bool> {
+        if self.hits.get(row, col).unwrap_or(false) {
+            Some(true)
+        } else if self.misses.get(row, col).unwrap_or(false) {
+            Some(false)
+        } else {
+            None
+        }
+    }
+}
+
+impl Default for GuessBoard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Serializable overall game state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
@@ -43,6 +89,12 @@ pub struct GameEngine {
     guess_misses: BB,
     enemy_remaining: usize,
     enemy_ships_remaining: [bool; NUM_SHIPS as usize],
+}
+
+impl Default for GameEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GameEngine {
@@ -75,6 +127,11 @@ impl GameEngine {
     /// Bitboard of our missed guesses on the opponent board.
     pub fn guess_misses(&self) -> BB {
         self.guess_misses
+    }
+
+    /// Bitboard of hits that are still relevant for targeting.
+    pub fn active_hits(&self) -> BB {
+        self.guess_hits
     }
 
     /// Handle an opponent guess on the player's board.
@@ -151,7 +208,7 @@ impl GameEngine {
     /// Lengths of enemy ships that have not yet been sunk. Entries are zero
     /// for ships already sunk, maintaining fixed-size output for `no_std`
     /// callers.
-pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
+    pub fn enemy_ship_lengths_remaining(&self) -> [usize; NUM_SHIPS as usize] {
         let mut lens = [0usize; NUM_SHIPS as usize];
         for (i, def) in SHIPS.iter().enumerate() {
             if self.enemy_ships_remaining[i] {

@@ -9,9 +9,10 @@ extern crate std;
 // Layer 1: Core game engine (no_std)
 // ========================================
 pub mod core;
+pub use crate::core as engine;
 
 // Convenience re-exports of core types
-pub use core::{
+pub use engine::{
     ai::*, bitboard::*, board::*, common::*, config::*, game::*, ship::*,
 };
 

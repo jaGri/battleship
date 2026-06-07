@@ -18,5 +18,5 @@ pub use bitboard::{BitBoard, BitBoardError};
 pub use board::{Board, BoardState};
 pub use common::{BoardError, GuessResult};
 pub use config::*;
-pub use game::{GameEngine, GameState, GameStatus, GuessBoardState};
+pub use game::{GameEngine, GameState, GameStatus, GuessBoard, GuessBoardState};
 pub use ship::{Orientation, Ship, ShipDef, ShipState};
