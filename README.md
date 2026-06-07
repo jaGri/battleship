@@ -29,7 +29,13 @@ Run a local human-vs-AI game:
 cargo run -- --seed 123 --difficulty hard
 ```
 
-Run tests:
+Run the default test suite:
+
+```bash
+cargo test
+```
+
+Run the full feature test suite:
 
 ```bash
 cargo test --all-features
@@ -39,4 +45,16 @@ Check no_std compatibility:
 
 ```bash
 cargo check --no-default-features
+```
+
+Check all feature combinations used by the current adapter boundaries:
+
+```bash
+cargo check --all-features
+```
+
+Run clippy when changing Rust code:
+
+```bash
+cargo clippy --all-features -- -D warnings
 ```

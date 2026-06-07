@@ -17,11 +17,28 @@ Current snapshot of the Battleship codebase after the adapter refactor.
 
 The core game mechanics remain library-first and no_std-compatible. Optional std features provide CLI, TCP, WebSocket, persistence, logging, BLE boundaries, and data-generation support.
 
+```text
+runner/main
+    |
+    v
+BattleshipApp
+    |-- PlayerAgent implementations
+    |-- Renderer / ScreenView
+    |-- InputSource / UiEvent
+    |-- TransportEndpoint / WireMessage
+    `-- SaveStore / SavedGame
+            |
+            v
+        engine/core rules
+```
+
 ## Runtime Flow
 
 `BattleshipApp` owns match orchestration. Agents choose placements or targets when requested; renderers receive passive `ScreenView` values; transports move `WireMessage` payloads; runners decide how to execute emitted `AppCommand` values.
 
 The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
+
+The active root crate no longer has a `src/interface` module. Historical planning notes may still describe legacy web interface work, but the current `web` and `websocket` features are adapter boundaries; completing a web runtime belongs to the separate web-adapter migration plan.
 
 ## Testing
 
@@ -44,6 +61,15 @@ Legacy mixed-player and RPC tests were removed with the old architecture.
 - `in-memory`: in-memory transport support for tests/runners.
 - `persistence`: app-facing save snapshots and stores.
 - `websocket`, `web`, `ble`, `esp-idf`, `data-generation`, `logging`: optional adapter boundaries.
+
+## Verification Checklist
+
+- Use `cargo test` for the default user-facing suite.
+- Use `cargo test --all-features` after Rust changes that touch adapters or public APIs.
+- Use `cargo check --no-default-features` after changes to core, app, protocol, render, or input code.
+- Use `cargo check --all-features` after feature-gate, transport, persistence, BLE, WebSocket, or data-generation changes.
+- Use `cargo clippy --all-features -- -D warnings` before completing Rust code changes when the local toolchain supports it.
+- Skip test runs for documentation-only updates unless files were renamed or generated artifacts need verification.
 
 ## Next Work
 
