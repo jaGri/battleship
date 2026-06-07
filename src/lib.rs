@@ -50,6 +50,8 @@ pub mod transport;
 pub use transport::heartbeat::HeartbeatTransport;
 #[cfg(feature = "in-memory")]
 pub use transport::in_memory::InMemoryTransport;
+#[cfg(feature = "std")]
+pub use transport::runner::TransportCommandRunner;
 #[cfg(feature = "tcp")]
 pub use transport::tcp::TcpTransport;
 

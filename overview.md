@@ -12,7 +12,7 @@ Current snapshot of the Battleship codebase after the adapter refactor.
 - `render_cli`: std-only CLI input and rendering adapters.
 - `web`: feature-gated browser input normalization and owned `ScreenView` serialization models.
 - `protocol`: versioned `WireMessage` values and domain payloads.
-- `transport`: app-facing `TransportEndpoint` plus std async TCP, heartbeat, and in-memory adapters.
+- `transport`: app-facing `TransportEndpoint`, transport command runner, and std async TCP, heartbeat, and in-memory adapters.
 - `persistence`: adapter-neutral snapshots, `SaveStore`, and file-backed active saves for app runners.
 - `data_generation`: feature-gated boundary for AI simulation datasets.
 
@@ -35,9 +35,9 @@ BattleshipApp
 
 ## Runtime Flow
 
-`BattleshipApp` owns match orchestration. Agents choose placements or targets when requested; renderers receive passive `ScreenView` values; transports move `WireMessage` payloads; runners decide how to execute emitted `AppCommand` values.
+`BattleshipApp` owns match orchestration. Agents choose placements or targets when requested; renderers receive passive `ScreenView` values; transports move `WireMessage` payloads; runners decide how to execute emitted `AppCommand` values. `TransportCommandRunner` provides the reusable bridge for app send commands, inbound transport messages, and connection state transitions.
 
-The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. It executes app save/load commands through a `FileSaveStore`, using `battleship.sav` in the current working directory as the active save. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
+The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. It executes app save/load commands through a `FileSaveStore`, using `battleship.sav` in the current working directory as the active save. Network and embedded runners should compose the same app-facing traits and the transport command bridge instead of embedding game logic in transport or UI code.
 
 The active root crate no longer has a `src/interface` module. The `web` feature now exposes focused input and render adapters; the `websocket` feature remains a transport boundary for runners that bridge `WireMessage` values into `BattleshipApp`.
 
@@ -48,7 +48,7 @@ The active test suite covers:
 - Engine, board, bitboard, and serialization round trips.
 - AI agent target selection and local app game completion.
 - App view generation, saved-game restoration, in-memory save stores, and file-backed active saves.
-- In-memory nonblocking transport endpoint behavior.
+- In-memory nonblocking transport endpoint behavior and remote runner message exchange.
 - TCP framing, malformed frames, cross-version handshakes, fuzz cases, and transport resilience.
 
 Legacy mixed-player and RPC tests were removed with the old architecture.
@@ -76,5 +76,5 @@ Legacy mixed-player and RPC tests were removed with the old architecture.
 
 - Split `std` dependencies more strictly so `std` means only standard-library support.
 - Expand WebSocket, BLE, and persistence backends beyond their adapter boundaries.
-- Add a remote-game runner that bridges async transports into `TransportEndpoint` polling.
+- Build concrete TCP/WebSocket/BLE runner UX around the existing transport command bridge.
 - Add renderer snapshots for CLI and future LCD/web renderers.

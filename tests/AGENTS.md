@@ -6,7 +6,7 @@ These guidelines apply to tracked integration tests in this directory.
 
 - `board_tests.rs`, `bitboard_tests.rs`, `board_props.rs`, and `game_engine_props.rs`: core board, bitboard, ship, and game-rule behavior.
 - `ai_difficulty_tests.rs` and `ai_game_tests.rs`: `AiAgent` difficulty behavior and local AI app completion.
-- `app_state_machine_tests.rs` and `adapter_architecture_tests.rs`: `BattleshipApp`, passive views, save-store behavior, and adapter boundaries.
+- `app_state_machine_tests.rs`, `adapter_architecture_tests.rs`, and `remote_play_tests.rs`: `BattleshipApp`, passive views, save-store behavior, remote-play runner behavior, and adapter boundaries.
 - `game_state_serialization.rs`, `cross_version_tests.rs`, `fuzz_bincode_tests.rs`, and `malformed_frame_tests.rs`: protocol serialization, versioning, and malformed-frame resilience.
 - `transport_resilience_tests.rs`: transport endpoint resilience, TCP behavior, heartbeat behavior, and in-memory transport behavior.
 

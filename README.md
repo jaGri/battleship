@@ -12,7 +12,7 @@ Rust Battleship implementation with a no_std-compatible rules engine and adapter
 - `render_cli`: CLI input and rendering adapters.
 - `web`: web input normalization and owned web view models.
 - `protocol`: versioned `WireMessage` payloads.
-- `transport`: nonblocking app endpoint plus TCP, heartbeat, in-memory, WebSocket, and BLE boundaries.
+- `transport`: nonblocking app endpoint, command runner bridge, and TCP, heartbeat, in-memory, WebSocket, and BLE boundaries.
 - `persistence`: saved-game snapshots, `SaveStore`, and file-backed active saves.
 - `data_generation`: optional AI simulation data boundary.
 
@@ -33,6 +33,10 @@ cargo run -- --seed 123 --difficulty hard
 The CLI runner saves active games to `battleship.sav` in the current working
 directory. Use "Resume Game" from the main menu to load that active save; the
 file is cleared when a game ends.
+
+Remote runner adapters can use `TransportCommandRunner<T>` to execute
+`AppCommand::Send` values through a `TransportEndpoint` and feed inbound
+`WireMessage` values back into `BattleshipApp`.
 
 Run the default test suite:
 

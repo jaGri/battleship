@@ -1,5 +1,10 @@
 use crate::protocol::WireMessage;
 
+#[cfg(feature = "std")]
+pub mod runner;
+#[cfg(feature = "std")]
+pub use runner::TransportCommandRunner;
+
 /// Nonblocking transport endpoint used by app runners.
 pub trait TransportEndpoint {
     type Error;
