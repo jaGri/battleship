@@ -1,6 +1,8 @@
 #![cfg(feature = "std")]
 
-use battleship::domain::{GameStatus, GuessResult, Ship, SyncPayload};
+use battleship::domain::{
+    GameStatus, GuessResult, RemotePlayer, RemoteSyncPayload, Ship, SyncPayload,
+};
 use battleship::protocol::WireMessage;
 use battleship::{BitBoard, BoardState, GameState, GuessBoardState, ShipState};
 use proptest::prelude::*;
@@ -29,6 +31,23 @@ fn arb_message() -> impl Strategy<Value = WireMessage> {
         }),
         (any::<u8>(), any::<u64>(), arb_sync_payload()).prop_map(|(v, s, payload)| {
             WireMessage::Sync {
+                version: v,
+                seq: s,
+                payload,
+            }
+        }),
+        (any::<u8>(), any::<u64>(), arb_remote_sync_payload()).prop_map(|(v, s, payload)| {
+            WireMessage::PrivateSync {
+                version: v,
+                seq: s,
+                payload,
+            }
+        }),
+        (any::<u8>(), any::<u64>()).prop_map(|(v, s)| WireMessage::Ready { version: v, seq: s }),
+        (any::<u8>(), any::<u64>())
+            .prop_map(|(v, s)| WireMessage::ResumeReq { version: v, seq: s }),
+        (any::<u8>(), any::<u64>(), arb_remote_sync_payload()).prop_map(|(v, s, payload)| {
+            WireMessage::ResumeAck {
                 version: v,
                 seq: s,
                 payload,
@@ -109,6 +128,44 @@ fn arb_sync_payload() -> impl Strategy<Value = SyncPayload> {
             enemy_ships_remaining,
         }
     })
+}
+
+fn arb_remote_player() -> impl Strategy<Value = RemotePlayer> {
+    prop_oneof![Just(RemotePlayer::Local), Just(RemotePlayer::Remote)]
+}
+
+fn arb_remote_sync_payload() -> impl Strategy<Value = RemoteSyncPayload> {
+    (
+        any::<u32>(),
+        arb_remote_player(),
+        any::<u64>(),
+        prop_oneof![Just(None), any::<u64>().prop_map(Some)],
+        arb_guess_board_state(),
+        any::<[bool; 5]>(),
+        any::<usize>(),
+        arb_game_status(),
+    )
+        .prop_map(
+            |(
+                turn_number,
+                active_player,
+                next_seq,
+                last_received_seq,
+                public_shots,
+                enemy_ships_remaining,
+                enemy_remaining,
+                status,
+            )| RemoteSyncPayload {
+                turn_number,
+                active_player,
+                next_seq,
+                last_received_seq,
+                public_shots,
+                enemy_ships_remaining,
+                enemy_remaining,
+                status,
+            },
+        )
 }
 
 fn arb_game_state() -> impl Strategy<Value = GameState> {

@@ -3,6 +3,8 @@ use alloc::string::{String, ToString};
 #[cfg(feature = "std")]
 use std::string::{String, ToString};
 
+use crate::core::{GameStatus as CoreGameStatus, GuessBoardState};
+
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct Board {/* grid, ships, hits/misses */}
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,12 +40,51 @@ pub struct SyncPayload {
     pub enemy_ships_remaining: [bool; crate::core::config::NUM_SHIPS],
 }
 
+/// Player identity inside private remote synchronization payloads.
+///
+/// Values are relative to the sender: `Local` is the sending app, and `Remote`
+/// is the connected peer. This keeps private sync payloads free of board state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+pub enum RemotePlayer {
+    Local,
+    Remote,
+}
+
+/// Hidden-information-safe remote synchronization payload.
+///
+/// This payload intentionally carries only public shot history and match
+/// metadata. It must not include `BoardState`, ship placements, or complete
+/// `GameState` values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+pub struct RemoteSyncPayload {
+    pub turn_number: u32,
+    pub active_player: RemotePlayer,
+    pub next_seq: u64,
+    pub last_received_seq: Option<u64>,
+    pub public_shots: GuessBoardState,
+    pub enemy_ships_remaining: [bool; crate::core::config::NUM_SHIPS],
+    pub enemy_remaining: usize,
+    pub status: GameStatus,
+}
+
 impl From<crate::core::common::GuessResult> for GuessResult {
     fn from(res: crate::core::common::GuessResult) -> Self {
         match res {
             crate::core::common::GuessResult::Hit => GuessResult::Hit,
             crate::core::common::GuessResult::Miss => GuessResult::Miss,
             crate::core::common::GuessResult::Sink(name) => GuessResult::Sink(name.to_string()),
+        }
+    }
+}
+
+impl From<CoreGameStatus> for GameStatus {
+    fn from(status: CoreGameStatus) -> Self {
+        match status {
+            CoreGameStatus::InProgress => GameStatus::InProgress,
+            CoreGameStatus::Won => GameStatus::Won,
+            CoreGameStatus::Lost => GameStatus::Lost,
         }
     }
 }

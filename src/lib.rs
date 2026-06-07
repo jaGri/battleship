@@ -26,9 +26,13 @@ pub mod render;
 pub mod render_cli;
 
 pub use agent::{
-    AiAgent, AiDifficulty, Difficulty, HumanAgent, PlayerAgent, RemoteAgent, ScriptedAgent,
+    AgentAction, AgentRequest, AiAgent, AiDifficulty, Difficulty, GameEvent, HumanAgent,
+    PlayerAgent, RemoteAgent, ScriptedAgent, ShipPlacement,
 };
-pub use app::{AppCommand, AppEvent, AppState, BattleshipApp, MatchState, SavedGame};
+pub use app::{
+    AgentPrompt, AgentPromptKind, AppCommand, AppEvent, AppState, BattleshipApp, ConnectionStatus,
+    MatchMode, MatchState, PlayerSide, RemoteRole, RemoteSession, SavedGame,
+};
 pub use input::{InputSource, UiEvent};
 #[cfg(feature = "persistence")]
 pub use persistence::{AdapterState, AgentSnapshot, MemorySaveStore, SaveStore, UiSnapshot};

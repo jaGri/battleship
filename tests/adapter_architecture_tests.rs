@@ -3,24 +3,25 @@
 use battleship::transport::TransportEndpoint;
 use battleship::{
     AiAgent, AiDifficulty, AppCommand, AppEvent, BattleshipApp, InMemoryTransport, MemorySaveStore,
-    SaveStore, ScreenView, WireMessage, PROTOCOL_VERSION,
+    SaveStore, ScreenView, UiEvent, WireMessage, PROTOCOL_VERSION,
 };
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 #[test]
 fn app_generates_game_screen_view() {
-    let app = BattleshipApp::new_local_ai(
+    let mut app = BattleshipApp::new_local_ai(
         AiAgent::new(AiDifficulty::Medium),
         AiAgent::new(AiDifficulty::Medium),
     );
+    app.update(AppEvent::Ui(UiEvent::Start));
 
     match app.view() {
-        ScreenView::Game(game) => {
-            assert!(game.my_turn);
-            assert_eq!(game.turn_number, 0);
+        ScreenView::Menu(menu) => {
+            assert_eq!(menu.title, "Battleship");
+            assert_eq!(menu.selected, 0);
         }
-        _ => panic!("expected game view"),
+        _ => panic!("expected menu view"),
     }
 }
 

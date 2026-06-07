@@ -39,6 +39,22 @@ pub enum WireMessage {
         seq: u64,
         payload: SyncPayload,
     },
+    /// Hidden-information-safe state synchronization between peers.
+    PrivateSync {
+        version: u8,
+        seq: u64,
+        payload: RemoteSyncPayload,
+    },
+    /// Local setup is complete and this peer is ready to play.
+    Ready { version: u8, seq: u64 },
+    /// Request a private resume synchronization payload.
+    ResumeReq { version: u8, seq: u64 },
+    /// Respond to a resume request with private synchronization metadata.
+    ResumeAck {
+        version: u8,
+        seq: u64,
+        payload: RemoteSyncPayload,
+    },
     /// Request the status of a particular ship by id.
     ShipStatusReq { version: u8, seq: u64, id: usize },
     /// Response containing the status of a ship.

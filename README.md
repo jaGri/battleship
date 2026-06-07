@@ -23,7 +23,7 @@ Build:
 cargo build
 ```
 
-Run a local AI-vs-AI simulation:
+Run a local human-vs-AI game:
 
 ```bash
 cargo run -- --seed 123 --difficulty hard

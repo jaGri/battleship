@@ -21,7 +21,7 @@ The core game mechanics remain library-first and no_std-compatible. Optional std
 
 `BattleshipApp` owns match orchestration. Agents choose placements or targets when requested; renderers receive passive `ScreenView` values; transports move `WireMessage` payloads; runners decide how to execute emitted `AppCommand` values.
 
-The binary is now a thin CLI runner around a local AI-vs-AI `BattleshipApp` simulation. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
+The binary is now a thin CLI runner around a local human-vs-AI `BattleshipApp` game. Network and embedded runners should be built as adapters around the same app-facing traits instead of embedding game logic in transport or UI code.
 
 ## Testing
 
